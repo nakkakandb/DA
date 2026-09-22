@@ -97,94 +97,55 @@ async def rule_setup_empty(db, portal: str) -> Optional[dict]:
 
 
 async def rule_wo_missing_bundles(db, portal: str) -> Optional[dict]:
-    """WO released/in_production yang belum di-generate bundle-nya."""
-    if portal != "production":
-        return None
-    wos = await db.rahaza_work_orders.find(
-        {"status": {"$in": ["released", "in_production"]}},
-        {"_id": 0, "id": 1, "wo_number": 1}
-    ).to_list(500)
-
-    orphan = []
-    for w in wos:
-        bc = await _count(db, "rahaza_bundles", {"work_order_id": w["id"]})
-        if bc == 0:
-            orphan.append(w)
-
-    if not orphan:
-        return None
-
-    sample = ", ".join(w["wo_number"] for w in orphan[:3])
-    more = f" (+{len(orphan)-3})" if len(orphan) > 3 else ""
-    return {
-        "id": "wo-missing-bundles",
-        "severity": "warning",
-        "category": "execution",
-        "title": f"{len(orphan)} WO produksi belum di-generate bundle",
-        "description": f"{sample}{more}",
-        "count": len(orphan),
-        "cta_label": "Buka Work Order",
-        "cta_module": "prod-work-orders",
-        "why": "Bundle adalah unit traceable berisi 20–50 pcs yang dipakai untuk tracking per-proses & QR scan. Tanpa bundle, WIP tidak granular dan operator harus input manual WO/model/size (rawan salah).",
-    }
+    """FASE 3 (T-03): bundle = konsep engine multi-stage yang DIARSIPKAN (E10) — aturan nonaktif."""
+    return None
 
 
 async def rule_orders_without_wo(db, portal: str) -> Optional[dict]:
-    """Order confirmed/in_production yang belum ada WO aktif."""
+    """PO produksi internal yang sudah berjalan tetapi belum punya job produksi (T-03: SSOT production_jobs)."""
     if portal != "production":
         return None
-    orders = await db.rahaza_orders.find(
-        {"status": {"$in": ["confirmed", "in_production"]}},
-        {"_id": 0, "id": 1, "order_number": 1}
+    pos = await db.production_pos.find(
+        {"status": {"$in": ["In Production", "Confirmed", "Approved", "confirmed", "in_production"]},
+         "business_type": "internal"},
+        {"_id": 0, "id": 1, "po_number": 1}
     ).to_list(500)
-
-    orphan = []
-    for o in orders:
-        wo_count = await _count(db, "rahaza_work_orders", {
-            "order_id": o["id"],
-            "status": {"$ne": "cancelled"}
-        })
-        if wo_count == 0:
-            orphan.append(o)
+    if not pos:
+        return None
+    po_ids = [p["id"] for p in pos]
+    with_job = set(await db.production_jobs.distinct("po_id", {"po_id": {"$in": po_ids}}))
+    orphan = [p for p in pos if p["id"] not in with_job]
 
     if not orphan:
         return None
 
-    sample = ", ".join(o["order_number"] for o in orphan[:3])
+    sample = ", ".join(o.get("po_number") or o["id"] for o in orphan[:3])
     more = f" (+{len(orphan)-3})" if len(orphan) > 3 else ""
     return {
         "id": "orders-without-wo",
         "severity": "warning",
         "category": "execution",
-        "title": f"{len(orphan)} order siap tapi belum punya Work Order",
+        "title": f"{len(orphan)} PO produksi berjalan tapi belum punya job produksi",
         "description": f"{sample}{more}",
         "count": len(orphan),
-        "cta_label": "Buka Order Produksi",
+        "cta_label": "Buka PO Produksi",
         "cta_module": "prod-orders",
-        "why": "Order yang confirmed tanpa WO berarti produksi belum dimulai. Generate WO langsung dari halaman Order — 1 klik akan membuat WO untuk semua item.",
+        "why": "PO yang sudah dikonfirmasi tanpa job produksi berarti produksi belum dimulai. Buat job produksi dari halaman PO.",
     }
 
 
 async def rule_wo_without_mi(db, portal: str) -> Optional[dict]:
-    """WO released/in_production belum ada Material Issue."""
+    """Job produksi aktif belum ada Material Issue (T-03: MI internal ter-anchor `job_id`)."""
     if portal != "production":
         return None
-    wos = await db.rahaza_work_orders.find(
-        {"status": {"$in": ["released", "in_production"]}},
-        {"_id": 0, "id": 1, "wo_number": 1, "bom_snapshot": 1}
-    ).to_list(500)
-
-    orphan = []
-    for w in wos:
-        # Skip kalau tidak ada BOM snapshot (tidak bisa di-MI anyway)
-        if not (w.get("bom_snapshot") or {}).get("bom_id"):
-            continue
-        mi_count = await _count(db, "rahaza_material_issues", {
-            "work_order_id": w["id"],
-            "status": {"$ne": "cancelled"}
-        })
-        if mi_count == 0:
-            orphan.append(w)
+    from core.wo_reader import load_wos
+    wos = await load_wos(db, statuses=["released", "in_progress"], extra_filter={"business_type": "internal"})
+    if not wos:
+        return None
+    job_ids = [w["id"] for w in wos]
+    with_mi = set(await db.rahaza_material_issues.distinct(
+        "job_id", {"job_id": {"$in": job_ids}, "status": {"$ne": "cancelled"}}))
+    orphan = [w for w in wos if w["id"] not in with_mi]
 
     if not orphan:
         return None
@@ -195,41 +156,18 @@ async def rule_wo_without_mi(db, portal: str) -> Optional[dict]:
         "id": "wo-without-mi",
         "severity": "warning",
         "category": "execution",
-        "title": f"{len(orphan)} WO produksi belum ada Material Issue",
+        "title": f"{len(orphan)} job produksi belum ada Material Issue",
         "description": f"{sample}{more}",
         "count": len(orphan),
         "cta_label": "Buat Material Issue",
         "cta_module": "wh-material-issue",
-        "why": "Tanpa Material Issue, material belum resmi keluar dari gudang ke line. Gunakan 'Draft dari WO' untuk generate otomatis sesuai BOM.",
+        "why": "Tanpa Material Issue, material belum resmi keluar dari gudang ke line.",
     }
 
 
 async def rule_wo_missing_bom(db, portal: str) -> Optional[dict]:
-    """WO draft/released tanpa BOM snapshot."""
-    if portal != "production":
-        return None
-    wos = await db.rahaza_work_orders.find(
-        {"status": {"$in": ["draft", "released", "in_production"]}},
-        {"_id": 0, "id": 1, "wo_number": 1, "model_code": 1, "size_code": 1, "bom_snapshot": 1}
-    ).to_list(500)
-
-    missing = [w for w in wos if not (w.get("bom_snapshot") or {}).get("bom_id")]
-    if not missing:
-        return None
-
-    # Unique model-size pairs
-    pairs = sorted({f"{w.get('model_code','?')}·{w.get('size_code','?')}" for w in missing})
-    return {
-        "id": "wo-missing-bom",
-        "severity": "error",
-        "category": "planning",
-        "title": f"{len(missing)} WO tidak punya BOM",
-        "description": f"Model·Size yang belum ada BOM: {', '.join(pairs[:4])}{'…' if len(pairs)>4 else ''}",
-        "count": len(missing),
-        "cta_label": "Lengkapi BOM",
-        "cta_module": "prod-bom",
-        "why": "Tanpa BOM, sistem tidak tahu berapa benang dan aksesoris yang dibutuhkan. Material Issue juga tidak bisa dibuat. Definisikan BOM per Model & Size.",
-    }
+    """FASE 3 (T-03): `bom_snapshot` milik engine lama; kelengkapan BOM kini dipantau papan BOM (prod-bom)."""
+    return None
 
 
 async def rule_lines_without_assignment_today(db, portal: str) -> Optional[dict]:
@@ -454,7 +392,7 @@ async def rule_empty_database_hint(db, portal: str) -> Optional[dict]:
     if portal != "production":
         return None
     ord_count = await _count(db, "rahaza_orders", {})
-    wo_count = await _count(db, "rahaza_work_orders", {})
+    wo_count = await _count(db, "production_jobs", {})  # T-03: SSOT job produksi
     wip_count = await _count(db, "rahaza_wip_events", {})
     if ord_count > 0 or wo_count > 0 or wip_count > 0:
         return None

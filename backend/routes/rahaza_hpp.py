@@ -21,7 +21,6 @@ from auth import require_auth, serialize_doc
 from core import material_fields  # FASE 6.6-B: SSOT nama field + alias legacy yarn_*
 from routes._maklon_adapter import legacy_orders_view as _lmo
 import uuid
-import re
 from datetime import datetime, timezone
 
 router = APIRouter(prefix="/api/rahaza", tags=["rahaza-hpp"])
@@ -88,7 +87,8 @@ async def update_settings(request: Request):
 
 
 async def _compute_hpp(db, wo_id: str):
-    wo = await db.rahaza_work_orders.find_one({"id": wo_id}, {"_id": 0})
+    from core.wo_reader import get_wo  # T-03: SSOT production_jobs
+    wo = await get_wo(db, wo_id)
     if not wo:
         raise HTTPException(404, "Work order tidak ditemukan.")
     settings = await db.rahaza_costing_settings.find_one({"id": SETTINGS_ID}, {"_id": 0}) or {}
@@ -98,7 +98,7 @@ async def _compute_hpp(db, wo_id: str):
     labor_fallback = float(settings.get("labor_rate_fallback_per_pcs") or 0)
 
     # ── 1) Material cost from confirmed material_issues for this WO
-    mi_rows = await db.rahaza_material_issues.find({"work_order_id": wo_id, "status": "issued"}, {"_id": 0}).to_list(500)
+    mi_rows = await db.rahaza_material_issues.find({"$or": [{"work_order_id": wo_id}, {"job_id": wo_id}], "status": "issued"}, {"_id": 0}).to_list(500)  # T-03: MI internal ter-anchor job_id
     material_cost = 0
     material_breakdown = []
     # Batch prefetch all materials referenced across MI items
@@ -127,7 +127,7 @@ async def _compute_hpp(db, wo_id: str):
             })
 
     # ── 2) Labor cost: sum of output events × rate for this WO
-    wip = await db.rahaza_wip_events.find({"work_order_id": wo_id, "event_type": "output"}, {"_id": 0}).to_list(500)
+    wip = await db.rahaza_wip_events.find({"$or": [{"work_order_id": wo_id}, {"job_id": wo_id}], "event_type": {"$in": ["output", "complete"]}}, {"_id": 0}).to_list(500)  # T-03
     total_output = sum(int(e.get("qty") or 0) for e in wip)
     labor_cost = 0
     labor_breakdown = []
@@ -504,22 +504,9 @@ async def hpp_for_production_po(po_id: str, request: Request):
     # Atau simpler: cari WO yang order_number_snapshot = po.po_number
     
     # Method 1: via order_id (jika PO punya order_id field)
-    order_id = po.get("order_id")
-    wos = []
-    if order_id:
-        wos = await db.rahaza_work_orders.find(
-            {"order_id": order_id, "source": "internal"}, {"_id": 0}
-        ).to_list(500)
-    
-    # Jika tidak ada order_id, coba via po_number match (fallback)
-    if not wos:
-        po_number = po.get("po_number", "")
-        if po_number:
-            # Cari WO yang order_number_snapshot contains po_number (loose match)
-            wos = await db.rahaza_work_orders.find(
-                {"order_number_snapshot": {"$regex": re.escape(po_number), "$options": "i"}, "source": "internal"},
-                {"_id": 0}
-            ).to_list(500)
+    # T-03 (FASE 3): SSOT production_jobs via core.wo_reader (job ter-anchor po_id).
+    from core.wo_reader import load_wos
+    wos = await load_wos(db, po_ids=[po_id], limit=500)
     
     if not wos:
         # No WOs found, return empty but valid structure

@@ -163,27 +163,25 @@ async def get_my_annual_review(request: Request):
     if not emp_id:
         return ok(data={"assignments": [], "reviews": [], "cycles": []})
 
-    # Get my assignments (I am the reviewee or reviewer)
-    assignments = await db.hris_assignments.find(
+    # T-17 (FASE 3): SSOT penilaian kinerja = dewi_perf_* (penulis routes/dewi_hris_performance.py);
+    # koleksi hris_* tidak pernah ditulis siapa pun.
+    assignments = await db.dewi_perf_assignments.find(
         {"$or": [{"employee_id": emp_id}, {"reviewer_id": emp_id}]},
         {"_id": 0}
     ).sort("created_at", -1).to_list(50)
 
-    # Get my review submissions
-    reviews = await db.hris_reviews.find(
+    reviews = await db.dewi_perf_reviews.find(
         {"employee_id": emp_id},
         {"_id": 0}
-    ).sort("submitted_at", -1).to_list(20)
+    ).sort("created_at", -1).to_list(20)
 
-    # Get active cycles
-    cycles = await db.hris_cycles.find(
+    cycles = await db.dewi_perf_cycles.find(
         {"status": {"$in": ["active", "in_progress"]}},
         {"_id": 0}
     ).sort("start_date", -1).to_list(5)
 
-    # Get my KPI assignments
-    kpis = await db.hris_kpi_assignments.find(
-        {"employee_id": emp_id},
+    kpis = await db.dewi_perf_kpis.find(
+        {"$or": [{"employee_id": emp_id}, {"cycle_id": {"$in": [c["id"] for c in cycles if c.get("id")]}}]},
         {"_id": 0}
     ).to_list(20)
 

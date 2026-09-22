@@ -151,12 +151,9 @@ async def production_rca(data: RCAFilter, request: Request):
         for r in line_rows
     ]
 
-    # WO delay analysis — count overdue vs on-time
-    wo_q = {"status": {"$in": ["in_progress", "complete", "completed"]}}
-    wos = await db.rahaza_work_orders.find(
-        wo_q, {"_id": 0, "id": 1, "wo_number": 1, "target_end_date": 1,
-               "completed_at": 1, "status": 1, "qty": 1}
-    ).limit(100).to_list(500)
+    # WO delay analysis — count overdue vs on-time (T-03: SSOT production_jobs via core.wo_reader)
+    from core.wo_reader import load_wos
+    wos = (await load_wos(db, statuses=["in_progress", "completed"], limit=100))[:100]
     overdue_count = 0
     on_time_count = 0
     # 2026-08-07 — DULU WO dengan `target_end_date` rusak di-`continue` DIAM-DIAM.

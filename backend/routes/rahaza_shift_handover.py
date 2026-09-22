@@ -453,25 +453,15 @@ async def download_shift_report_pdf(handover_id: str, request: Request):
         if shift:
             handover["shift_name"] = shift.get("name", shift.get("code", ""))
 
-    # Fetch WO summary for the line(s) mentioned in this handover
+    # Fetch WO summary (line_id/line_code tidak lagi dipakai — job produksi tidak punya line)
     wo_summary = []
-    line_id = handover.get("line_id")
-    line_code = handover.get("line_code")
-    query = {}
-    if line_id:
-        query["line_id"] = line_id
-    elif line_code:
-        query["line_code"] = line_code
-    else:
-        # Fetch WOs from today regardless of line (limit 10)
-        query["start_date"] = {"$lte": handover.get("date", date.today().isoformat())}
-
-    wos = await db.rahaza_work_orders.find(
-        {**query, "status": {"$in": ["released", "in_progress", "completed"]}},
-        {"_id": 0, "wo_number": 1, "model_code": 1, "qty": 1,
-         "qty_produced": 1, "qty_passed_qc": 1, "status": 1}
-    ).limit(15).to_list(500)
-    wo_summary = list(wos)
+    # T-03 (FASE 3): SSOT production_jobs via core.wo_reader (job tidak punya line_id → filter tanggal saja).
+    from core.wo_reader import load_wos
+    as_of = handover.get("date", date.today().isoformat())
+    wos = [w for w in await load_wos(db, statuses=["released", "in_progress", "completed"], limit=200)
+           if str(w.get("start_date") or "")[:10] <= as_of][:15]
+    wo_summary = [{k: w.get(k) for k in ("wo_number", "model_code", "qty", "qty_produced", "qty_passed_qc", "status")}
+                  for w in wos]
 
     try:
         from utils.shift_report_pdf import build_shift_report_pdf

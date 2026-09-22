@@ -1,25 +1,21 @@
 """Production & maklon aggregates for AI endpoints.
 
-RC-28/RC-17 (SSOT MASTER REPAIR PLAN PART 4): production_work_orders (phantom)
--> rahaza_work_orders. Peta field: quantity->qty, order_code->wo_number,
-product_name->model_name, target_date->target_date||due_date; status rahaza:
-in_progress/planned/released/completed.
+T-03 (FASE 3): SSOT WO = production_jobs via core.wo_reader (rahaza_work_orders diarsip).
+Bentuk keluaran lama dipertahankan: order_code<-wo_number, product_name<-model_name,
+quantity<-qty, target_date<-due_date.
 """
 from __future__ import annotations
 
 from datetime import datetime, timezone
 
-_ACTIVE_WO_STATUSES = ["in_progress", "planned", "released", "pending", "not_started"]
+_ACTIVE_WO_STATUSES = ["in_progress", "released"]
 
 
 async def production_summary(db, *, since_iso: str) -> dict:
     """Counts of WOs created and completed since timestamp."""
-    new_count = await db.rahaza_work_orders.count_documents(
-        {"created_at": {"$gte": since_iso}}
-    )
-    done_count = await db.rahaza_work_orders.count_documents(
-        {"status": "completed", "updated_at": {"$gte": since_iso}}
-    )
+    from core.wo_reader import count_wos
+    new_count = await count_wos(db, created_since=since_iso)
+    done_count = await count_wos(db, statuses=["completed"], completed_since=since_iso)
     return {"work_order_baru": new_count, "work_order_selesai": done_count}
 
 
@@ -35,14 +31,9 @@ async def maklon_summary(db, *, since_iso: str, lmo_adapter) -> dict:
 
 async def active_workorders(db, *, limit: int = 10) -> list[dict]:
     """Top active work orders (projection only)."""
-    rows = await db.rahaza_work_orders.find(
-        {"status": {"$in": _ACTIVE_WO_STATUSES}},
-        {
-            "_id": 0, "id": 1, "wo_number": 1, "model_name": 1,
-            "qty": 1, "priority": 1, "target_date": 1, "due_date": 1,
-            "status": 1,
-        },
-    ).sort("due_date", 1).limit(limit).to_list(limit)
+    from core.wo_reader import load_wos
+    rows = sorted(await load_wos(db, statuses=_ACTIVE_WO_STATUSES),
+                  key=lambda r: str(r.get("due_date") or "9999"))[:limit]
     # Bentuk output kompatibel dgn konsumen lama
     return [
         {
@@ -71,9 +62,8 @@ async def active_maklon(db, *, lmo_adapter, limit: int = 10) -> list[dict]:
 
 async def production_counts(db, *, lmo_adapter) -> dict:
     """Counts of active WOs/maklon for optimizer overview."""
-    wo_active = await db.rahaza_work_orders.count_documents(
-        {"status": {"$in": _ACTIVE_WO_STATUSES}}
-    )
+    from core.wo_reader import count_wos
+    wo_active = await count_wos(db, statuses=_ACTIVE_WO_STATUSES)
     maklon_active = await lmo_adapter(db).count_documents(
         {"stage": {"$in": ["confirmed", "material_ready", "cutting", "sewing", "qc"]}}
     )

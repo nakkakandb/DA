@@ -95,15 +95,9 @@ async def get_po_stage_summary(po_id: str, request: Request):
     if not po:
         raise HTTPException(404, 'PO tidak ditemukan')
 
-    # Sumber WIP ada DUA: WO engine lama (work_order_id) dan job produksi internal
-    # (job_id, event_type='complete' — mirror HR-1). AUDIT 2026-09-03: dulu hanya WO
-    # yang dibaca, padahal koleksi rahaza_work_orders tidak punya penulis lagi ⇒
-    # ringkasan tahap selalu 0 dan jatuh ke angka manual.
-    wo_ids_raw = await db.rahaza_work_orders.find(
-        {'order_id': po_id, 'source': {'$ne': 'maklon'}},
-        {'_id': 0, 'id': 1, 'qty': 1, 'status': 1}
-    ).to_list(500)
-    wo_ids = [w['id'] for w in wo_ids_raw]
+    # Sumber WIP: job produksi internal (job_id, event_type='complete' — mirror HR-1).
+    # FASE 3 (T-03): rahaza_work_orders diarsip — hanya production_jobs yang dibaca.
+    wo_ids = []
     jobs = await db.production_jobs.find({'po_id': po_id}, {'_id': 0, 'id': 1}).to_list(500)
     job_ids = [j['id'] for j in jobs]
     job_qty = 0
@@ -113,7 +107,7 @@ async def get_po_stage_summary(po_id: str, request: Request):
             {'$group': {'_id': None, 'q': {'$sum': {'$ifNull': ['$available_qty', {'$ifNull': ['$shipment_qty', {'$ifNull': ['$ordered_qty', 0]}]}]}}}},
         ]).to_list(1)
         job_qty = int((agg_q[0]['q'] if agg_q else 0) or 0)
-    total_wo_qty = sum(int(w.get('qty', 0)) for w in wo_ids_raw) + job_qty
+    total_wo_qty = job_qty
     anchor = {'$or': [{'work_order_id': {'$in': wo_ids}}, {'job_id': {'$in': job_ids}},
                       {'production_po_id': po_id}]}
 
@@ -192,7 +186,7 @@ async def get_po_stage_summary(po_id: str, request: Request):
         'status': po.get('status', ''),
         'qty_ordered': qty_ordered,
         'total_wo_qty': total_wo_qty,
-        'wo_count': len(wo_ids_raw) + len(job_ids),
+        'wo_count': len(job_ids),
         'stage_qty': {
             'cutting_input':   int(manual_sq.get('cutting_input', 0)),
             'cutting_output':  _pick('cutting_output', 'cutting_output'),
@@ -218,8 +212,10 @@ async def get_po_stage_summary(po_id: str, request: Request):
         elif sq['cutting_output'] > 0:
             summary['progress_pct'] = min(49, 30 + int((sq['cutting_output'] / qty_ordered) * 19))
         else:
-            completed_wos = sum(1 for w in wo_ids_raw if w.get('status') == 'completed')
-            summary['progress_pct'] = int((completed_wos / len(wo_ids_raw) * 100)) if wo_ids_raw else 0
+            from core.production_job_lifecycle import JOB_CLOSED_STATUSES
+            job_status = await db.production_jobs.find({'id': {'$in': job_ids}}, {'_id': 0, 'status': 1}).to_list(500)
+            completed_wos = sum(1 for j in job_status if str(j.get('status')) in JOB_CLOSED_STATUSES)
+            summary['progress_pct'] = int((completed_wos / len(job_ids) * 100)) if job_ids else 0
     else:
         summary['progress_pct'] = 0
 

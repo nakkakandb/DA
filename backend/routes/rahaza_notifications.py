@@ -329,11 +329,10 @@ async def scan_wo_due(request: Request):
     today = datetime.now(timezone.utc).date()
     deadline = (today + timedelta(days=2)).isoformat()
 
-    wos = await db.rahaza_work_orders.find(
-        {"status": {"$in": ["in_progress", "pending"]},
-         "due_date": {"$lte": deadline, "$gte": today.isoformat()}},
-        {"_id": 0}
-    ).to_list(500)
+    # T-03 (FASE 3): SSOT production_jobs via core.wo_reader (rahaza_work_orders diarsip).
+    from core.wo_reader import load_wos
+    wos = [w for w in await load_wos(db, statuses=["in_progress", "released"], limit=500)
+           if w.get("due_date") and today.isoformat() <= str(w["due_date"])[:10] <= deadline]
 
     published = 0
     for w in wos:

@@ -29,10 +29,8 @@ CATEGORY A — User-listed orphans (TD-011 baseline):
     work_orders                 (replaced by rahaza_work_orders)
     production_work_orders      (orphan)
     dewi_attendance             (replaced by rahaza_attendance)
-    dewi_perf_cycles            (replaced by hris_cycles)
-    dewi_perf_assignments       (replaced by hris_assignments)
-    dewi_perf_kpis              (replaced by hris_kpi_assignments)
-    dewi_perf_reviews           (replaced by hris_reviews)
+    (T-17/FASE 3: dewi_perf_* DIHAPUS dari daftar — itu SSOT penilaian kinerja yang
+     ditulis routes/dewi_hris_performance.py; hris_* justru yang tak pernah ditulis.)
     dewi_kol_creators           (replaced by marketing_kol_creators)
     dewi_kol_deals              (replaced by marketing_creator_deals)
     dewi_kol_samples            (replaced by marketing_creator_samples)
@@ -122,7 +120,6 @@ CATEGORIES: dict[str, dict] = {
         'collections': [
             'accessories', 'work_orders', 'production_work_orders',
             'dewi_attendance',
-            'dewi_perf_cycles', 'dewi_perf_assignments', 'dewi_perf_kpis', 'dewi_perf_reviews',
             'dewi_kol_creators', 'dewi_kol_deals', 'dewi_kol_samples',
             'invoices', 'rahaza_invoices', 'payments',
             'warehouse_inbound', 'warehouse_outbound', 'warehouse_stock',

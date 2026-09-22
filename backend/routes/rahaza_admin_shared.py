@@ -25,7 +25,7 @@ PURGE_COLLECTIONS = [
     "rahaza_models", "rahaza_sizes", "rahaza_customers",
     # Rahaza production
     "rahaza_line_assignments", "rahaza_wip_events",
-    "rahaza_orders", "rahaza_boms", "rahaza_work_orders",
+    "rahaza_orders", "rahaza_boms",  # rahaza_work_orders dihapus (T-03: engine diarsip)
     "rahaza_bundles", "rahaza_model_process_sop",
     # Rahaza inventory
     "rahaza_materials", "rahaza_material_stock",

@@ -139,14 +139,10 @@ async def get_weekly_digest(
     since = _now() - timedelta(days=days)
     since_str = since.isoformat()
 
-    # --- Production: Work Orders --- (RC-07: SSOT rahaza_work_orders)
-    total_wo = await db.rahaza_work_orders.count_documents({
-        "created_at": {"$gte": since_str}
-    })
-    completed_wo = await db.rahaza_work_orders.count_documents({
-        "status": "completed",
-        "updated_at": {"$gte": since_str}
-    })
+    # --- Production: Work Orders --- (T-03: SSOT production_jobs via core.wo_reader)
+    from core.wo_reader import count_wos
+    total_wo = await count_wos(db, created_since=since_str)
+    completed_wo = await count_wos(db, statuses=["completed"], completed_since=since_str)
 
     # --- Finance: Invoices --- (RC-07: SSOT rahaza_ar_invoices, field issue_date)
     invoices = await db.rahaza_ar_invoices.find(

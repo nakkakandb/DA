@@ -36,6 +36,7 @@ from auth import require_auth, serialize_doc, log_activity
 from routes.rahaza_audit import log_audit
 from routes.rahaza_notifications import publish_notification
 from routes.rahaza_posting import post_cogs_shipment
+from core.wo_reader import load_wos  # T-03: SSOT production_jobs
 from datetime import datetime, timezone
 from io import BytesIO
 import logging
@@ -139,7 +140,7 @@ async def create_shipment(body: dict, request: Request):
     wo_ids = [it.get("wo_id") for it in items if it.get("wo_id")]
     wo_map = {}
     if wo_ids:
-        async for w in db.rahaza_work_orders.find({"id": {"$in": wo_ids}}, {"_id": 0}):
+        for w in await load_wos(db, ids=wo_ids):
             wo_map[w["id"]] = w
     enriched = []
     for it in items:
@@ -212,7 +213,7 @@ async def update_shipment(sid: str, body: dict, request: Request):
         wo_ids = [it.get("wo_id") for it in items if it.get("wo_id")]
         wo_map = {}
         if wo_ids:
-            async for w in db.rahaza_work_orders.find({"id": {"$in": wo_ids}}, {"_id": 0}):
+            for w in await load_wos(db, ids=wo_ids):
                 wo_map[w["id"]] = w
         enriched = []
         for it in items:
@@ -319,7 +320,7 @@ async def change_status(sid: str, body: dict, request: Request):
             if valid_items:
                 wo_ids = list({wo_id for wo_id, _ in valid_items})
                 wo_map = {}
-                async for w in db.rahaza_work_orders.find({"id": {"$in": wo_ids}}, {"_id": 0}):
+                for w in await load_wos(db, ids=wo_ids):
                     wo_map[w["id"]] = w
                 m_ids = list({wo_map[wid].get("model_id") for wid in wo_map if wo_map[wid].get("model_id")})
                 s_ids = list({wo_map[wid].get("size_id") for wid in wo_map if wo_map[wid].get("size_id")})

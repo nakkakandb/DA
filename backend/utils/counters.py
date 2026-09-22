@@ -294,7 +294,7 @@ def invalidate_format_cache(key: Optional[str] = None) -> None:
 # kosong, sehingga dokumen lama yang nomornya null/"" tidak menghalangi.
 UNIQUE_NUMBERED_FIELDS: tuple[tuple[str, str], ...] = (
     ("rahaza_journal_entries", "je_number"),
-    ("rahaza_work_orders", "wo_number"),
+    ("production_jobs", "job_number"),  # T-03: menggantikan rahaza_work_orders.wo_number (engine diarsip)
     ("rahaza_orders", "order_number"),
     ("rahaza_ar_invoices", "invoice_number"),
     ("rahaza_ap_invoices", "invoice_number"),

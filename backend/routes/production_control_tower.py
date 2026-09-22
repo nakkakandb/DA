@@ -39,38 +39,14 @@ async def _load_active_wos(db, extra_filter: Optional[Dict[str, Any]] = None) ->
     `_enrich_jobs` yang sama dengan Tracking Produksi, lalu dipetakan ke bentuk "WO"
     yang sudah dipakai layar (wo_number/client_name/qty/qty_produced/deadline/status).
     """
-    from routes.production_execution import _enrich_jobs
-    from core.production_job_lifecycle import JOB_CLOSED_STATUSES
-    q: Dict[str, Any] = {'parent_job_id': {'$in': [None, '']}, **(extra_filter or {})}
-    jobs = await db.production_jobs.find(q, {'_id': 0}).sort('created_at', -1).to_list(2000)
-    jobs = [j for j in jobs if not j.get('parent_job_id')]
-    enriched = await _enrich_jobs(db, jobs)
-    po_ids = list({j.get('po_id') for j in enriched if j.get('po_id')})
-    pos = await db.production_pos.find({'id': {'$in': po_ids}}, {'_id': 0, 'id': 1, 'deadline': 1,
-                                                                'delivery_deadline': 1, 'status': 1}).to_list(None) if po_ids else []
-    po_map = {p['id']: p for p in pos}
-    out = []
-    for j in enriched:
-        raw_status = str(j.get('status') or 'Open')
-        closed = raw_status in JOB_CLOSED_STATUSES or raw_status.lower() in WO_TERMINAL
-        po = po_map.get(j.get('po_id') or '', {})
-        out.append({
-            'id': j.get('id'),
-            'wo_number': j.get('job_number') or j.get('id'),
-            'po_id': j.get('po_id'),
-            'po_number': j.get('po_number'),
-            'client_name': j.get('vendor_name') or 'Produksi Internal',
-            'source': 'internal' if (j.get('business_type') or 'internal') == 'internal' else 'maklon',
-            'status': 'completed' if closed else ('in_progress' if (j.get('total_produced') or 0) > 0 else 'released'),
-            'raw_status': raw_status,
-            'qty': j.get('total_available') or j.get('total_ordered') or 0,
-            'qty_produced': j.get('total_produced') or 0,
-            'qty_shipped': j.get('total_shipped_to_buyer') or 0,
-            'deadline': j.get('deadline') or j.get('delivery_deadline') or po.get('deadline') or po.get('delivery_deadline'),
-            'completed_at': j.get('completed_at') or j.get('updated_at'),
-            'created_at': j.get('created_at'),
-        })
-    return out
+    # FASE 3 (T-03): pemetaan job→WO kini SATU di `core.wo_reader` (dipakai 20+ pembaca lain).
+    from core.wo_reader import load_wos
+    rows = await load_wos(db, extra_filter=extra_filter)
+    for r in rows:
+        if r['status'] == 'cancelled':
+            r['status'] = 'completed'
+        r['completed_at'] = r.get('completed_at') or r.get('updated_at')
+    return rows
 
 
 def _today_iso() -> str:

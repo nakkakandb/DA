@@ -74,11 +74,11 @@ async def get_dashboard(request: Request):
     active_orders = await db.rahaza_orders.count_documents({'status': {'$in': ['confirmed', 'in_production']}})
     completed_orders = await db.rahaza_orders.count_documents({'status': {'$in': ['completed', 'closed']}})
 
-    # Work Orders (rahaza)
-    active_wos = await db.rahaza_work_orders.count_documents({'status': {'$in': ['released', 'in_progress']}})
-    wo_status_agg = await db.rahaza_work_orders.aggregate([
-        {'$group': {'_id': '$status', 'count': {'$sum': 1}}}
-    ]).to_list(500)
+    # Work Orders — T-03 (FASE 3): SSOT production_jobs via core.wo_reader
+    from core.wo_reader import status_counts
+    _wo_counts = await status_counts(db)
+    active_wos = _wo_counts.get('released', 0) + _wo_counts.get('in_progress', 0)
+    wo_status_agg = [{'_id': k, 'count': v} for k, v in _wo_counts.items()]
 
     # ── AR / AP (Rahaza finance) ──
     ar_invoices = await db.rahaza_ar_invoices.find({}, {'_id': 0}).to_list(500)
@@ -337,25 +337,24 @@ async def get_dashboard_analytics(request: Request):
             'week': f"W{8-w}", 'label': start.strftime('%d/%m'),
             'qty': qty
         })
-    # Production completion rate by product — RC-04: SSOT rahaza_work_orders group model_name
-    product_completion = await db.rahaza_work_orders.aggregate([
-        {'$group': {'_id': '$model_name', 'total_available': {'$sum': {'$ifNull': ['$qty', 0]}},
-                    'total_produced': {'$sum': {'$ifNull': ['$completed_qty', 0]}}}},
-        {'$sort': {'total_available': -1}}, {'$limit': 10}
-    ]).to_list(10)
-    product_comp = [{'product': p['_id'] or 'Unknown',
-                     'available': p.get('total_available', 0),
-                     'produced': p.get('total_produced', 0),
-                     'rate': round((p['total_produced'] / p['total_available'] * 100) if p.get('total_available', 0) > 0 else 0, 1)
-                     } for p in product_completion]
+    # Production completion rate by product — T-03 (FASE 3): SSOT production_jobs via core.wo_reader
+    from core.wo_reader import load_wos
+    _all_wos = await load_wos(db)
+    _by_model: dict = {}
+    for w in _all_wos:
+        b = _by_model.setdefault(w.get('model_name') or 'Unknown', {'a': 0, 'p': 0})
+        b['a'] += w.get('qty') or 0
+        b['p'] += w.get('completed_qty') or 0
+    product_comp = sorted([{'product': k, 'available': v['a'], 'produced': v['p'],
+                            'rate': round((v['p'] / v['a'] * 100) if v['a'] > 0 else 0, 1)}
+                           for k, v in _by_model.items()], key=lambda x: -x['available'])[:10]
     # Shipment/receiving status breakdown — RC-04: SSOT warehouse_receiving
     ship_status_agg = await db.warehouse_receiving.aggregate([
         {'$group': {'_id': '$status', 'count': {'$sum': 1}}}
     ]).to_list(20)
-    # WO deadline distribution — RC-04: SSOT rahaza_work_orders.due_date (string)
-    all_pos = await db.rahaza_work_orders.find(
-        {'status': {'$nin': ['completed', 'draft', 'cancelled']}},
-        {'_id': 0, 'due_date': 1, 'wo_number': 1}).to_list(500)
+    # WO deadline distribution — T-03: due_date dari job/PO (string ISO)
+    all_pos = [{'due_date': w.get('due_date'), 'wo_number': w.get('wo_number')}
+               for w in _all_wos if w['status'] not in ('completed', 'cancelled')]
     overdue_count = 0
     this_week_count = 0
     next_week_count = 0
@@ -526,17 +525,9 @@ async def global_search(request: Request):
             'module': 'prod-orders',
         })
 
-    # ── Work Orders ────────────────────────────────────────────────────────
-    wos = await db.rahaza_work_orders.find(
-        {'$or': [
-            {'wo_number': regex},
-            {'order_number_snapshot': regex},
-            {'model_code_snapshot': regex},
-            {'model_name_snapshot': regex},
-        ]},
-        {'_id': 0, 'id': 1, 'wo_number': 1, 'order_number_snapshot': 1, 'model_code_snapshot': 1,
-         'model_name_snapshot': 1, 'status': 1, 'qty': 1}
-    ).limit(limit_per_type).to_list(500)
+    # ── Work Orders ── T-03 (FASE 3): SSOT production_jobs via core.wo_reader
+    from core.wo_reader import search_wos
+    wos = await search_wos(db, regex, limit=limit_per_type)
     for w in wos:
         results.append({
             'type': 'Work Order',

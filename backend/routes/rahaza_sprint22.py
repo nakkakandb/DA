@@ -21,6 +21,7 @@ from database import get_db
 from core.stock_schema import read_qty
 from auth import require_auth, log_activity
 from utils.counters import next_counter_batch
+from core.wo_reader import load_wos  # T-03: SSOT production_jobs
 from typing import Optional
 import uuid
 import logging
@@ -81,7 +82,7 @@ async def preview_bulk_mi(request: Request):
         raise HTTPException(400, "Maksimum 50 WO per batch.")
 
     # Fetch WOs
-    wos = await db.rahaza_work_orders.find({"id": {"$in": wo_ids}}, {"_id": 0}).to_list(500)
+    wos = await load_wos(db, ids=wo_ids, limit=500)
     wo_map = {w["id"]: w for w in wos}
 
     # Fetch current stock summary (material_id → total qty)
@@ -212,7 +213,7 @@ async def generate_bulk_mi(request: Request):
     # Get next MI counter range — atomic batch reservation via unified counters SSOT
     start_seq = await next_counter_batch(db, "mi_number", count=len(wo_ids), namespace="rahaza")
 
-    wos = await db.rahaza_work_orders.find({"id": {"$in": wo_ids}}, {"_id": 0}).to_list(500)
+    wos = await load_wos(db, ids=wo_ids, limit=500)
     wo_map = {w["id"]: w for w in wos}
 
     stock_docs = await db.rahaza_material_stock.find({}, {"_id": 0, "material_id": 1, "qty": 1, "total_qty": 1, "quantity": 1}).to_list(500)
@@ -301,6 +302,7 @@ async def generate_bulk_mi(request: Request):
             "id": _uid(),
             "mi_number": mi_num,
             "work_order_id": wo_id,
+            "job_id": wo_id,  # T-03: WO = production_jobs.id
             "wo_number": wo.get("wo_number"),
             "model_code": wo.get("model_code"),
             "status": "draft",

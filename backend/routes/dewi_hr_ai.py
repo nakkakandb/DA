@@ -339,9 +339,9 @@ async def generate_coaching_plan(
 
     emp_id = employee.get("id") or employee.get("employee_code")
 
-    # Get latest performance review
-    latest_review = await db.hris_reviews.find_one(
-        {"employee_id": emp_id}, sort=[("submitted_at", -1)]
+    # Get latest performance review — T-17 (FASE 3): SSOT dewi_perf_reviews (hris_reviews tak pernah ditulis)
+    latest_review = await db.dewi_perf_reviews.find_one(
+        {"employee_id": emp_id}, {"_id": 0}, sort=[("created_at", -1)]
     )
 
     # Get attendance summary (last 3 months) — RC-01/K6: SSOT events; status nyata hadir/izin/sakit
@@ -350,10 +350,14 @@ async def generate_coaching_plan(
     att_late  = await db.rahaza_attendance_events.count_documents({"employee_id": emp_id, "is_late": True, "date": {"$gte": since90.strftime("%Y-%m-%d")}})
     att_absent= await db.rahaza_attendance_events.count_documents({"employee_id": emp_id, "status": {"$in": ["izin", "sakit"]}, "date": {"$gte": since90.strftime("%Y-%m-%d")}})
 
-    # Get completed training
-    trainings = await db.hris_training_completions.find(
-        {"employee_id": emp_id}, {"_id": 0, "training_name": 1, "score": 1, "completed_at": 1}
-    ).sort("completed_at", -1).limit(5).to_list(5)
+    # Get completed training — T-17 (FASE 3): SSOT dewi_lms_enrollments (hris_training_completions tak pernah ditulis)
+    trainings = [
+        {"training_name": e.get("course_title"), "score": e.get("quiz_score"), "completed_at": e.get("completed_at")}
+        for e in await db.dewi_lms_enrollments.find(
+            {"employee_id": emp_id, "status": "completed"},
+            {"_id": 0, "course_title": 1, "quiz_score": 1, "completed_at": 1}
+        ).sort("completed_at", -1).limit(5).to_list(5)
+    ]
 
     profile = {
         "name": employee.get("name"),

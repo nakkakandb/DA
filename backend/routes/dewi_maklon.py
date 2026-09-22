@@ -477,27 +477,12 @@ async def get_order_production_detail(order_id: str, user: dict = Depends(requir
     linked_wo_ids = order.get('linked_wo_ids') or []
     wos = []
     if linked_wo_ids:
-        raw_wos = await db.rahaza_work_orders.find(
-            {'id': {'$in': linked_wo_ids}}, {'_id': 0}
-        ).to_list(500)
-        # Enrich each WO with progress
-        for wo in raw_wos:
-            wo_id = wo['id']
-            wo_qty = int(wo.get('qty', 0))
-            # Count WIP events for final process
-            procs = await db.rahaza_processes.find(
-                {'active': True, 'is_rework': False}, {'_id': 0}
-            ).sort('order_seq', 1).to_list(500)
-            if procs:
-                last_proc = procs[-1]
-                pipe = [
-                    {'$match': {'event_type': 'output', 'work_order_id': wo_id, 'process_id': last_proc['id']}},
-                    {'$group': {'_id': None, 'total': {'$sum': '$qty'}}},
-                ]
-                res = await db.rahaza_wip_events.aggregate(pipe).to_list(1)
-                completed_qty = res[0]['total'] if res else 0
-            else:
-                completed_qty = 0
+        # T-03 (FASE 3): SSOT production_jobs via core.wo_reader (rahaza_work_orders diarsip);
+        # completed_qty langsung dari progress job, bukan rahaza_wip_events engine lama.
+        from core.wo_reader import load_wos
+        for wo in await load_wos(db, ids=linked_wo_ids, limit=500):
+            wo_qty = int(wo.get('qty', 0) or 0)
+            completed_qty = int(wo.get('completed_qty', 0) or 0)
             wo['completed_qty'] = completed_qty
             wo['progress_pct'] = round((completed_qty / wo_qty) * 100, 1) if wo_qty > 0 else 0
             wos.append(wo)

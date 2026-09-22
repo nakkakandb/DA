@@ -109,20 +109,14 @@ async def _finance_kpis(db, year: int, month: int) -> dict:
 # ---------------------------------------------------------------------------
 async def _production_kpis(db, year: int, month: int) -> dict:
     start, end = _month_range(year, month)
-    wo_pipeline = [
-        {"$match": {"start_date": {"$gte": start, "$lte": end}}},
-        {"$group": {
-            "_id": "$status",
-            "count": {"$sum": 1},
-            "total_qty": {"$sum": {"$ifNull": ["$qty", 0]}},
-            "total_completed": {"$sum": {"$ifNull": ["$completed_qty", 0]}},
-        }},
-    ]
-    # RC-02: SSOT rahaza_work_orders (field: qty/completed_qty/start_date)
-    wo_rows = await db.rahaza_work_orders.aggregate(wo_pipeline).to_list(20)
+    # T-03 (FASE 3): SSOT production_jobs via core.wo_reader (start_date = created_at job).
+    from core.wo_reader import load_wos
     wo_by_status: dict = {}
-    for r in wo_rows:
-        wo_by_status[r["_id"] or "unknown"] = {"count": r["count"], "qty": r["total_qty"], "completed": r["total_completed"]}
+    for w in await load_wos(db, extra_filter={"created_at": {"$gte": start, "$lte": end + "T23:59:59+00:00"}}):
+        b = wo_by_status.setdefault(w["status"], {"count": 0, "qty": 0, "completed": 0})
+        b["count"] += 1
+        b["qty"] += w.get("qty") or 0
+        b["completed"] += w.get("completed_qty") or 0
 
     total_wo = sum(v["count"] for v in wo_by_status.values())
     completed_wo = wo_by_status.get("completed", {}).get("count", 0)

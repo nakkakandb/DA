@@ -13,7 +13,6 @@ from database import get_db
 from auth import require_auth
 from routes._maklon_adapter import legacy_orders_view as _lmo
 import uuid
-import re
 import csv
 import io
 from datetime import datetime, timezone
@@ -61,20 +60,9 @@ async def export_po_report_csv(po_id: str, request: Request):
         raise HTTPException(404, "Production PO tidak ditemukan.")
     
     # Get WOs via order_id or po_number
-    order_id = po.get("order_id")
-    wos = []
-    if order_id:
-        wos = await db.rahaza_work_orders.find(
-            {"order_id": order_id, "source": "internal"}, {"_id": 0}
-        ).to_list(500)
-    
-    if not wos:
-        po_number = po.get("po_number", "")
-        if po_number:
-            wos = await db.rahaza_work_orders.find(
-                {"order_number_snapshot": {"$regex": re.escape(po_number), "$options": "i"}, "source": "internal"},
-                {"_id": 0}
-            ).to_list(500)
+    # T-03 (FASE 3): SSOT production_jobs via core.wo_reader (job ter-anchor po_id).
+    from core.wo_reader import load_wos
+    wos = await load_wos(db, po_ids=[po_id], limit=500)
     
     # Build CSV
     output = io.StringIO()
@@ -350,20 +338,9 @@ async def export_po_report_excel(po_id: str, request: Request):
         raise HTTPException(404, "Production PO tidak ditemukan.")
     
     # Get WOs
-    order_id = po.get("order_id")
-    wos = []
-    if order_id:
-        wos = await db.rahaza_work_orders.find(
-            {"order_id": order_id, "source": "internal"}, {"_id": 0}
-        ).to_list(500)
-    
-    if not wos:
-        po_number = po.get("po_number", "")
-        if po_number:
-            wos = await db.rahaza_work_orders.find(
-                {"order_number_snapshot": {"$regex": re.escape(po_number), "$options": "i"}, "source": "internal"},
-                {"_id": 0}
-            ).to_list(500)
+    # T-03 (FASE 3): SSOT production_jobs via core.wo_reader (job ter-anchor po_id).
+    from core.wo_reader import load_wos
+    wos = await load_wos(db, po_ids=[po_id], limit=500)
     
     # Create Excel workbook
     wb = Workbook()

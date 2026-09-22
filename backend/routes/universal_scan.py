@@ -125,11 +125,8 @@ async def _resolve_material(db, code: str):
 
 
 async def _resolve_work_order(db, code: str):
-    doc = await db.rahaza_work_orders.find_one(
-        {"wo_number": {"$regex": f"^{re.escape(code)}$", "$options": "i"}},
-        {"_id": 0, "id": 1, "wo_number": 1, "style_name": 1, "status": 1,
-         "qty": 1, "due_date": 1, "buyer": 1, "order_number": 1},
-    )
+    from core.wo_reader import find_wo_by_number  # T-03: SSOT production_jobs
+    doc = await find_wo_by_number(db, code)
     if not doc:
         return None
     return {

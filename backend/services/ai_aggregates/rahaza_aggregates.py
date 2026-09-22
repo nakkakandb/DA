@@ -4,6 +4,7 @@ Replaces .find().to_list(500) patterns with $group pipelines.
 """
 from __future__ import annotations
 
+import re
 from datetime import date, datetime, timezone
 
 
@@ -64,13 +65,10 @@ async def active_alerts(db, *, limit: int = 5) -> list[dict]:
 async def wo_backlog(db) -> dict:
     """Counts for active and overdue WOs."""
     today = date.today().isoformat()
-    active = await db.rahaza_work_orders.count_documents(
-        {"status": {"$in": ["released", "in_progress"]}}
-    )
-    overdue = await db.rahaza_work_orders.count_documents({
-        "status": {"$nin": ["completed", "cancelled"]},
-        "due_date": {"$lt": today},
-    })
+    # T-03 (FASE 3): SSOT production_jobs via core.wo_reader
+    from core.wo_reader import count_wos
+    active = await count_wos(db, statuses=["released", "in_progress"])
+    overdue = await count_wos(db, statuses=["released", "in_progress"], overdue_before=today)
     return {"active": active, "overdue": overdue}
 
 
@@ -111,22 +109,23 @@ async def smart_search(db, *, query: str, today_iso: str | None = None, limit: i
     escaped = q.replace("\\", "\\\\").replace(".", "\\.")
     regex = {"$regex": escaped, "$options": "i"}
 
-    # Work orders: OR over wo_number + intent keywords
-    wo_filter = {"$or": [{"wo_number": regex}]}
-    if "overdue" in q_lower or "terlambat" in q_lower:
-        wo_filter["$or"].append({
-            "due_date": {"$lt": today_iso},
-            "status": {"$nin": ["completed", "cancelled"]},
-        })
+    # Work orders — T-03 (FASE 3): SSOT production_jobs via core.wo_reader.
+    # Cocok bila nomor job cocok regex, ATAU kata kunci niat (overdue/aktif/selesai) terpenuhi.
+    from core.wo_reader import load_wos
+    _all = await load_wos(db, limit=500)
+    _rx = re.compile(escaped, re.I)
+    want_overdue = "overdue" in q_lower or "terlambat" in q_lower
+    want_status = set()
     if "aktif" in q_lower:
-        wo_filter["$or"].append({"status": {"$in": ["in_progress", "released"]}})
+        want_status |= {"in_progress", "released"}
     if "selesai" in q_lower:
-        wo_filter["$or"].append({"status": "completed"})
+        want_status.add("completed")
     if "draft" in q_lower:
-        wo_filter["$or"].append({"status": "draft"})
-    wos = await db.rahaza_work_orders.find(
-        wo_filter, {"_id": 0, "id": 1, "wo_number": 1, "status": 1}
-    ).limit(limit).to_list(limit)
+        want_status.add("released")
+    wos = [w for w in _all if _rx.search(str(w.get("wo_number") or ""))
+           or (want_overdue and w["status"] in ("released", "in_progress")
+               and str(w.get("due_date") or "9999")[:10] < today_iso)
+           or (w["status"] in want_status)][:limit]
     for wo in wos:
         results.append({
             "type": "work_order", "id": wo.get("id"),
@@ -187,15 +186,11 @@ async def daily_wip_avg(db, *, since_iso: str) -> float:
 
 async def list_predictive_targets(db, *, wo_id: str | None) -> list[dict]:
     """Fetch WOs for predictive-delay (single or many)."""
+    from core.wo_reader import load_wos  # T-03: SSOT production_jobs
     if wo_id:
-        return await db.rahaza_work_orders.find(
-            {"id": wo_id},
-            {"_id": 0, "id": 1, "wo_number": 1, "due_date": 1, "qty": 1, "qty_produced": 1},
-        ).to_list(1)
-    return await db.rahaza_work_orders.find(
-        {"status": {"$in": ["released", "in_progress"]}},
-        {"_id": 0, "id": 1, "wo_number": 1, "due_date": 1, "qty": 1, "qty_produced": 1},
-    ).sort("due_date", 1).limit(50).to_list(50)
+        return await load_wos(db, ids=[wo_id], limit=1)
+    rows = await load_wos(db, statuses=["released", "in_progress"])
+    return sorted(rows, key=lambda r: str(r.get("due_date") or "9999"))[:50]
 
 
 def now_utc() -> datetime:

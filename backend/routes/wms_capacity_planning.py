@@ -49,24 +49,14 @@ async def _get_config(db) -> dict:
 
 async def _active_wo_load(db) -> dict:
     today = date.today().isoformat()
-    # RC-17: SSOT WO = rahaza_work_orders (production_work_orders = phantom/MISSING).
-    # Peta field: quantity→qty, qty_completed→completed_qty, order_code→wo_number,
-    # product_name→model_name, target_date→target_date||due_date; status rahaza:
-    # in_progress/planned/released (bukan pending/not_started).
-    pipeline = [
-        {"$match": {"status": {"$in": ["in_progress", "planned", "released", "pending", "not_started"]}}},
-        {"$project": {
-            "_id": 0, "id": 1,
-            "order_code": {"$ifNull": ["$wo_number", ""]},
-            "product_name": {"$ifNull": ["$model_name", ""]},
-            "quantity": {"$ifNull": ["$qty", 0]},
-            "qty_completed": {"$ifNull": ["$completed_qty", 0]},
-            "target_date": {"$ifNull": ["$target_date", "$due_date"]},
-            "priority": 1, "status": 1,
-        }},
-        {"$limit": 200},
-    ]
-    wos = await db.rahaza_work_orders.aggregate(pipeline).to_list(200)
+    # T-03 (FASE 3): SSOT WO = production_jobs via core.wo_reader (rahaza_work_orders diarsip).
+    from core.wo_reader import load_wos
+    rows = await load_wos(db, statuses=["in_progress", "released"], limit=200)
+    wos = [{
+        "id": r["id"], "order_code": r.get("wo_number", ""), "product_name": r.get("model_name", ""),
+        "quantity": r.get("qty", 0), "qty_completed": r.get("completed_qty", 0),
+        "target_date": r.get("target_date"), "priority": r.get("priority", "normal"), "status": r["status"],
+    } for r in rows]
     overdue_count = 0
     at_risk_count = 0
     total_remaining = 0

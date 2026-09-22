@@ -1548,7 +1548,7 @@ app.include_router(operations_pdf_configs_router, dependencies=_DENY_EXTERNAL_AN
 app.include_router(pdf_document_settings_router, dependencies=_DENY_EXTERNAL_AND_MKT)
 # SESI #19 — layar SATU PINTU "PDF & Kop Surat" (menggantikan dua layar di atas)
 app.include_router(pdf_templates_router, dependencies=_DENY_EXTERNAL_AND_MKT)
-app.include_router(document_number_configs_router)
+app.include_router(document_number_configs_router, dependencies=_DENY_EXTERNAL)  # T-01 2.5
 app.include_router(file_router)
 app.include_router(ws_router)
 # warehouse_router REMOVED — Session 25 Hard Unification (use /api/wms/legacy/* via wms_legacy_router)
@@ -1846,7 +1846,7 @@ app.include_router(marketing_periods_router, dependencies=_DENY_EXTERNAL)
 app.include_router(marketing_change_log_router, dependencies=_DENY_EXTERNAL)
 app.include_router(marketing_reports_router, dependencies=_DENY_EXTERNAL)
 app.include_router(marketing_reports_weekly_router, dependencies=_DENY_EXTERNAL)
-app.include_router(marketing_orders_router)
+app.include_router(marketing_orders_router, dependencies=_DENY_EXTERNAL)  # T-01 2.5
 app.include_router(marketing_complaints_router, dependencies=_DENY_EXTERNAL)
 # Phase B.1 Toko Cutover routers
 app.include_router(marketing_toko_dashboard_router, dependencies=_DENY_EXTERNAL)
@@ -2196,14 +2196,14 @@ from routes.notifications import router as notifications_router
 from routes.search import router as search_router
 from routes.activity_feed import router as activity_feed_router
 from routes.study_groups import router as study_groups_router
-app.include_router(comm_router)
+app.include_router(comm_router, dependencies=_DENY_EXTERNAL)  # T-01 2.5: chat internal karyawan
 app.include_router(asset_router, dependencies=_DENY_EXTERNAL)
 app.include_router(procurement_router, dependencies=_DENY_EXTERNAL)
 app.include_router(procurement_suppliers_router, dependencies=_DENY_EXTERNAL_AND_MKT)
 app.include_router(procurement_dashboard_router, dependencies=_DENY_EXTERNAL_AND_MKT)
 
 from routes.universal_scan import router as universal_scan_router
-app.include_router(universal_scan_router)
+app.include_router(universal_scan_router, dependencies=_DENY_EXTERNAL)  # T-01 2.5
 app.include_router(workspace_router, dependencies=_DENY_EXTERNAL)
 app.include_router(lms_student_router, dependencies=_DENY_EXTERNAL)
 app.include_router(notifications_router)

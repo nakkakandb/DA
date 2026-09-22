@@ -16,6 +16,8 @@ from database import get_db
 from auth import require_auth, serialize_doc, log_activity
 from utils.query_guards import q_date
 from routes.marketing_shared import _uid, _now, _get_user, _sanitize, TaskTemplateCreate, RecurrenceConfig
+from core.authz import only  # T-01 2.3
+from core.roles import MARKETING_ROLES  # T-01 2.3
 
 logger = logging.getLogger(__name__)
 
@@ -136,7 +138,7 @@ async def update_task_template(template_id: str, data: TaskTemplateCreate, reque
     return serialize_doc({"message": "Task template updated", "template": updated})
 
 
-@router.delete("/task-templates/{template_id}")
+@router.delete("/task-templates/{template_id}", dependencies=only(*MARKETING_ROLES))  # T-01 2.3
 async def delete_task_template(template_id: str, request: Request):
     """Delete task template (set is_active=false)"""
     await require_auth(request)

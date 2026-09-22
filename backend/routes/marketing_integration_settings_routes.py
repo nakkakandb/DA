@@ -11,6 +11,8 @@ from pydantic import BaseModel
 from database import get_db
 from auth import require_auth
 from routes.shared import require_portal
+from core.authz import only  # T-01 2.3
+from core.roles import MGMT_ROLES  # T-01 2.3
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/marketing/integration-settings", tags=["marketing-integration-settings"])
@@ -152,7 +154,7 @@ async def save_config(platform: str, body: IntegrationConfigIn, request: Request
     return {"success": True, "data": {**serialize(doc), "credentials": merged_creds}}
 
 
-@router.delete("/{platform}")
+@router.delete("/{platform}", dependencies=only(*MGMT_ROLES))  # T-01 2.3
 async def disconnect_platform(platform: str, request: Request):
     """Clear all credentials for this platform."""
     await require_auth(request)

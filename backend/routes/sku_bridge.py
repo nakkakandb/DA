@@ -22,6 +22,8 @@ from pydantic import BaseModel, Field
 from auth import log_activity, require_auth, serialize_doc
 from core import sku_bridge as bridge
 from database import get_db
+from core.authz import only  # T-01 2.3
+from core.roles import MARKETING_ROLES, WAREHOUSE_ROLES  # T-01 2.3
 
 router = APIRouter(prefix='/api/sku-bridge', tags=['sku-bridge'])
 
@@ -250,7 +252,7 @@ async def create_master(body: CreateMasterIn, user: dict = Depends(require_auth)
     return res
 
 
-@router.delete('/mappings/{platform_sku_id}')
+@router.delete('/mappings/{platform_sku_id}', dependencies=only(*WAREHOUSE_ROLES, *MARKETING_ROLES))  # T-01 2.3
 async def unmap(platform_sku_id: str, user: dict = Depends(require_auth)):
     db = get_db()
     res = await bridge.remove_mapping(db, platform_sku_id, user=user)

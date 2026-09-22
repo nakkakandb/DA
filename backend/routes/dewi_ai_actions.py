@@ -24,6 +24,8 @@ from typing import Optional
 from fastapi import APIRouter, Query, Request, HTTPException
 from database import get_db
 from auth import require_auth
+from core.authz import only  # T-01 2.3
+from core.roles import MGMT_ROLES  # T-01 2.3
 
 router = APIRouter(prefix="/api/dewi/ai-actions", tags=["dewi-ai-actions"])
 
@@ -176,7 +178,7 @@ async def update_action(action_id: str, request: Request):
     return {"ok": True, "action": _s(doc)}
 
 
-@router.delete("/{action_id}")
+@router.delete("/{action_id}", dependencies=only(*MGMT_ROLES))  # T-01 2.3
 async def delete_action(action_id: str, request: Request):
     await require_auth(request)
     db = get_db()

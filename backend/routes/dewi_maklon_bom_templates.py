@@ -25,6 +25,8 @@ from core import bom_uom  # 2026-08-02: konversi satuan baris BOM → satuan das
 from utils.money import parse_id_number, MoneyParseError  # 2026-08-07: SSOT angka locale-ID
 import uuid
 import logging
+from core.authz import only  # T-01 2.3
+from core.roles import MAKLON_ROLES  # T-01 2.3
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix='/api/dewi/maklon', tags=['Dewi-Maklon-BOM-Template'], dependencies=[Depends(deny_external_dep)])
@@ -295,7 +297,7 @@ async def activate_bom_template(template_id: str, user: dict = Depends(require_a
     return {'message': f"v{doc['version']} sekarang aktif untuk artikel ini"}
 
 
-@router.delete('/bom-templates/{template_id}')
+@router.delete('/bom-templates/{template_id}', dependencies=only(*MAKLON_ROLES))  # T-01 2.3
 async def delete_bom_template(template_id: str, user: dict = Depends(require_auth)):
     """Hapus permanen (boleh karena versioning sudah handle audit)."""
     db = get_db()

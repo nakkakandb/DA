@@ -27,6 +27,8 @@ from fastapi import APIRouter, Request, HTTPException
 from database import get_db
 from auth import require_auth
 from routes.shared import get_pagination_params, paginated_response
+from core.authz import only  # T-01 2.3
+from core.roles import MGMT_ROLES  # T-01 2.3
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +77,7 @@ async def update_accessory(acc_id: str, request: Request):
     raise HTTPException(410, detail={"deprecated": True, "use": "/api/acc/items", "message": _ACC_DEPR_MSG})
 
 
-@router.delete("/accessories/{acc_id}")
+@router.delete("/accessories/{acc_id}", dependencies=only(*MGMT_ROLES))  # T-01 2.3
 async def delete_accessory(acc_id: str, request: Request):
     await require_auth(request)
     logger.warning("[DEPRECATED-NOOP] DELETE /api/accessories/%s called — %s", acc_id, _ACC_DEPR_MSG)
@@ -109,7 +111,7 @@ async def update_acc_shipment(sid: str, request: Request):
     raise HTTPException(410, detail={"deprecated": True, "use": "/api/acc/items", "message": _ACC_DEPR_MSG})
 
 
-@router.delete("/accessory-shipments/{sid}")
+@router.delete("/accessory-shipments/{sid}", dependencies=only(*MGMT_ROLES))  # T-01 2.3
 async def delete_acc_shipment(sid: str, request: Request):
     await require_auth(request)
     logger.warning("[DEPRECATED-NOOP] DELETE /api/accessory-shipments/%s — %s", sid, _ACC_DEPR_MSG)

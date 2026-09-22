@@ -27,6 +27,8 @@ from fastapi import APIRouter, Request, Query, HTTPException
 from pydantic import BaseModel, Field
 from database import get_db
 from auth import require_auth
+from core.authz import only  # T-01 2.3
+from core.roles import PRODUCTION_ROLES  # T-01 2.3
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/production/predictive-maintenance", tags=["predictive-maintenance"])
@@ -379,7 +381,7 @@ async def create_log(request: Request, payload: MaintenanceLogIn):
     return {"success": True, "data": log, "message": "Maintenance log dicatat"}
 
 
-@router.delete("/maintenance-logs/{log_id}")
+@router.delete("/maintenance-logs/{log_id}", dependencies=only(*PRODUCTION_ROLES))  # T-01 2.3
 async def delete_log(request: Request, log_id: str):
     await require_auth(request)
     db = get_db()

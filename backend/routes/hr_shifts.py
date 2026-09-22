@@ -41,6 +41,8 @@ from services.hr_shift_service import (
     _active_shift_query,
 )
 import logging
+from core.authz import only  # T-01 2.3
+from core.roles import HR_ROLES  # T-01 2.3
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/hr/shifts", tags=["hr-shifts"])
@@ -246,7 +248,7 @@ async def get_employee_assignments(request: Request, employee_id: str):
     return _ok(items, total=len(items))
 
 
-@router.delete("/assignments/{assignment_id}")
+@router.delete("/assignments/{assignment_id}", dependencies=only(*HR_ROLES))  # T-01 2.3
 async def cancel_assignment(request: Request, assignment_id: str):
     await require_auth(request)
     db = get_db()

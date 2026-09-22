@@ -16,6 +16,8 @@ from datetime import datetime, timezone, date, timedelta
 from typing import Optional
 import uuid
 import logging
+from core.authz import only  # T-01 2.3
+from core.roles import PRODUCTION_ROLES  # T-01 2.3
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/rahaza", tags=["rahaza-production-calendar"])
@@ -162,7 +164,7 @@ async def update_calendar_entry(entry_id: str, request: Request):
     return updated
 
 
-@router.delete("/production-calendar/{entry_id}")
+@router.delete("/production-calendar/{entry_id}", dependencies=only(*PRODUCTION_ROLES))  # T-01 2.3
 async def delete_calendar_entry(entry_id: str, request: Request):
     """Delete calendar entry."""
     await require_auth(request)

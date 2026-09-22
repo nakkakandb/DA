@@ -34,6 +34,7 @@ from dotenv import load_dotenv
 from fastapi import APIRouter, HTTPException, Request
 
 from auth import require_auth
+from core.roles import HR_ROLES  # T-01 2.5
 from database import get_db
 
 load_dotenv(Path(__file__).parent.parent / '.env')
@@ -221,7 +222,9 @@ async def send_test_push(request: Request):
 @router.post("/send")
 async def send_push(request: Request):
     """(Admin/System) Send push notification to specific user or all subscribers."""
-    await require_auth(request)
+    user = await require_auth(request)
+    if (user.get("role") or "").lower() not in HR_ROLES + ("admin", "superadmin"):
+        raise HTTPException(403, "Hanya admin/HR yang boleh mengirim push notification.")  # T-01 2.5
     if not is_configured():
         raise HTTPException(503, "Web Push belum dikonfigurasi di server.")
     db = get_db()

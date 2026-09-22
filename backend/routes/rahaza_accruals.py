@@ -35,6 +35,8 @@ from dateutil.relativedelta import relativedelta
 from typing import Optional
 import uuid
 import logging
+from core.authz import only  # T-01 2.3
+from core.roles import FINANCE_ROLES  # T-01 2.3
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/rahaza/finance", tags=["rahaza-accruals"])
@@ -187,7 +189,7 @@ async def update_accrual(accrual_id: str, request: Request):
     return serialize_doc(updated)
 
 
-@router.delete("/accruals/{accrual_id}")
+@router.delete("/accruals/{accrual_id}", dependencies=only(*FINANCE_ROLES))  # T-01 2.3
 async def delete_accrual(accrual_id: str, request: Request):
     user = await require_auth(request)
     db = get_db()

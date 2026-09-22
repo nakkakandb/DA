@@ -16,6 +16,8 @@ from routes.shared import require_portal
 import os
 from ai_llm import LlmChat, UserMessage
 import json
+from core.authz import only  # T-01 2.3
+from core.roles import MARKETING_CS_ROLES  # T-01 2.3
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/marketing/reviews", tags=["marketing-reviews"])
@@ -420,7 +422,7 @@ async def update_review(review_id: str, body: ReviewUpdate, request: Request):
     updated = {**existing, **upd}
     return {"success": True, "data": serialize(updated)}
 
-@router.delete("/{review_id}")
+@router.delete("/{review_id}", dependencies=only(*MARKETING_CS_ROLES))  # T-01 2.3
 async def delete_review(review_id: str, request: Request):
     await require_auth(request)
     db = get_db()

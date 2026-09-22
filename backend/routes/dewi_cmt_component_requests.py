@@ -17,6 +17,8 @@ from datetime import datetime, timezone
 from typing import Optional
 import uuid
 import re
+from core.authz import only  # T-01 2.3
+from core.roles import PRODUCTION_ROLES  # T-01 2.3
 
 router = APIRouter(prefix="/api/dewi/cmt-component-requests", tags=["Production-CMT-Shortage-Requests"])
 
@@ -285,7 +287,7 @@ async def set_status(request_id: str, body: dict, user: dict = Depends(require_a
 
 
 # ─── DELETE ──────────────────────────────────────────────────────────────────
-@router.delete('/{request_id}')
+@router.delete('/{request_id}', dependencies=only(*PRODUCTION_ROLES))  # T-01 2.3
 async def delete_request(request_id: str, user: dict = Depends(require_auth)):
     db = get_db()
     doc = await db.dewi_cmt_component_requests.find_one({'id': request_id})

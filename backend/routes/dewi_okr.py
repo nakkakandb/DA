@@ -28,6 +28,8 @@ from fastapi import APIRouter, Request, Query, HTTPException
 from pydantic import BaseModel, Field
 from database import get_db
 from auth import require_auth
+from core.authz import only  # T-01 2.3
+from core.roles import HR_ROLES  # T-01 2.3
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/management/okr", tags=["okr"])
@@ -298,7 +300,7 @@ async def update_key_result(request: Request, kr_id: str, payload: KeyResultPatc
     return {"success": True, "message": "Key Result diperbarui"}
 
 
-@router.delete("/key-results/{kr_id}")
+@router.delete("/key-results/{kr_id}", dependencies=only(*HR_ROLES))  # T-01 2.3
 async def delete_key_result(request: Request, kr_id: str):
     await require_auth(request)
     db = get_db()

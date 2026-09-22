@@ -23,6 +23,7 @@ New endpoints:
 from fastapi import APIRouter, Request, HTTPException, UploadFile, File
 from database import get_db
 from auth import require_auth, serialize_doc, log_activity
+from core.roles import HR_ROLES  # T-01 2.3
 import uuid
 import re
 import logging
@@ -921,13 +922,19 @@ async def bulk_approve_leaves(request: Request):
 
 @router.delete("/leaves/{leave_id}")
 async def delete_leave(leave_id: str, request: Request):
-    """Delete draft/rejected leave request."""
-    await require_auth(request)
+    """Delete draft/rejected leave request — hanya pemohon sendiri atau HR/admin (T-01 2.3)."""
+    user = await require_auth(request)
     db = get_db()
 
     leave = await db.rahaza_leave_requests.find_one({"id": leave_id}, {"_id": 0})
     if not leave:
         raise HTTPException(404, "Leave request tidak ditemukan.")
+    role = (user.get("role") or "").lower()
+    if role not in HR_ROLES + ("admin", "superadmin"):
+        from utils.employee_identity import resolve_my_employee
+        my_emp = await resolve_my_employee(db, user)
+        if not my_emp or my_emp.get("id") != leave.get("employee_id"):
+            raise HTTPException(403, "Hanya pemohon cuti sendiri atau HR yang boleh menghapus pengajuan ini.")
     if leave.get("status") not in ("draft", "rejected"):
         raise HTTPException(400, "Hanya leave Draft/Rejected yang bisa dihapus.")
 

@@ -22,6 +22,8 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional, List
 import json
 import asyncio
+from core.authz import only  # T-01 2.3
+from core.roles import MARKETING_ROLES  # T-01 2.3
 
 _log = logging.getLogger(__name__)
 
@@ -151,7 +153,7 @@ async def update_script(script_id: str, data: ScriptCreate, request: Request):
     return serialize_doc({'message': 'Script berhasil diupdate'})
 
 
-@router.delete('/scripts/{script_id}')
+@router.delete('/scripts/{script_id}', dependencies=only(*MARKETING_ROLES))  # T-01 2.3
 async def delete_script(script_id: str, request: Request):
     """Admin deletes script (soft delete)"""
     await require_auth(request)

@@ -28,6 +28,8 @@ from routes.production_rbac import deny_external_dep
 from pydantic import BaseModel, Field
 from database import get_db
 from auth import require_auth
+from core.authz import only  # T-01 2.3
+from core.roles import MAKLON_ROLES  # T-01 2.3
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/maklon/ai-quote", tags=["maklon-ai-quote"], dependencies=[Depends(deny_external_dep)])
@@ -312,7 +314,7 @@ async def accept_quote(request: Request, quote_id: str):
     return {"success": True, "message": "Quote ditandai accepted"}
 
 
-@router.delete("/{quote_id}")
+@router.delete("/{quote_id}", dependencies=only(*MAKLON_ROLES))  # T-01 2.3
 async def delete_quote(request: Request, quote_id: str):
     await require_auth(request)
     db = get_db()

@@ -17,6 +17,7 @@ from typing import Optional
 from fastapi import APIRouter, Request, HTTPException
 from database import get_db
 from auth import require_auth
+from core.roles import HR_ROLES  # T-01 2.3
 
 router = APIRouter(prefix="/api/rahaza/delegations", tags=["rahaza-delegations"])
 
@@ -91,8 +92,14 @@ async def create_delegation(request: Request):
 
 @router.delete("/{delegation_id}")
 async def revoke_delegation(delegation_id: str, request: Request):
-    await require_auth(request)
+    user = await require_auth(request)
     db = get_db()
+    doc = await db.rahaza_approval_delegations.find_one({"id": delegation_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(404, "Delegation tidak ditemukan.")
+    # T-01 2.3: hanya pendelegasi sendiri atau HR/admin yang boleh mencabut.
+    if doc.get("delegator_id") != user.get("id") and (user.get("role") or "").lower() not in HR_ROLES + ("admin", "superadmin"):
+        raise HTTPException(403, "Hanya pendelegasi atau HR yang boleh mencabut delegasi ini.")
     res = await db.rahaza_approval_delegations.update_one(
         {"id": delegation_id},
         {"$set": {"is_active": False, "revoked_at": _now()}}

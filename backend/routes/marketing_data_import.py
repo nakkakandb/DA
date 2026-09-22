@@ -65,6 +65,8 @@ router = APIRouter(prefix="/api/marketing/data-import", tags=["marketing-data-im
 
 UPLOAD_DIR = "marketing-data-import"   # prefix di object storage (bukan folder pod)
 from object_storage import put_object as _put_object, get_object as _get_object
+from core.authz import only  # T-01 2.3
+from core.roles import MARKETING_ROLES  # T-01 2.3
 
 
 def _read_session_file(path: str) -> Optional[bytes]:
@@ -865,7 +867,7 @@ async def list_formats(request: Request, source_type: Optional[str] = Query(None
                      "tidak ada tebakan diam-diam.")}
 
 
-@router.delete("/formats/{fingerprint}")
+@router.delete("/formats/{fingerprint}", dependencies=only(*MARKETING_ROLES))  # T-01 2.3
 async def forget_format(fingerprint: str, request: Request,
                         source_type: str = Query(...)):
     """LUPAKAN satu susunan kolom yang diingat.
@@ -3517,7 +3519,7 @@ async def undo_report(session_id: str, request: Request):
             "trail": _ser(sample)}
 
 
-@router.delete("/sessions/{session_id}")
+@router.delete("/sessions/{session_id}", dependencies=only(*MARKETING_ROLES))  # T-01 2.3
 async def delete_session(session_id: str, request: Request):
     await require_auth(request)
     db = get_db()

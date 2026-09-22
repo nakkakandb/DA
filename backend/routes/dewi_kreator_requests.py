@@ -17,6 +17,8 @@ from datetime import datetime, timezone
 from typing import Optional
 import uuid
 import re
+from core.authz import only  # T-01 2.3
+from core.roles import MARKETING_ROLES  # T-01 2.3
 
 router = APIRouter(prefix="/api/dewi/kreator-requests", tags=["Marketing-Kreator-Requests"])
 
@@ -288,7 +290,7 @@ async def mark_delivered(request_id: str, body: dict = None, user: dict = Depend
 
 
 # ─── DELETE ──────────────────────────────────────────────────────────────────
-@router.delete('/{request_id}')
+@router.delete('/{request_id}', dependencies=only(*MARKETING_ROLES))  # T-01 2.3
 async def delete_request(request_id: str, user: dict = Depends(require_auth)):
     db = get_db()
     doc = await db.dewi_kreator_requests.find_one({'id': request_id})

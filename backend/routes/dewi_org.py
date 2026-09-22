@@ -8,6 +8,8 @@ from auth import require_auth
 from datetime import datetime, timezone
 from typing import Optional
 import uuid
+from core.authz import only  # T-01 2.3
+from core.roles import HR_ROLES  # T-01 2.3
 
 router = APIRouter(prefix="/api/dewi/org", tags=["OrgChart"])
 
@@ -100,7 +102,7 @@ async def update_unit(
     doc = await db.dewi_org_units.find_one({"unit_id": unit_id})
     return {"ok": True, "unit": serialize(doc)}
 
-@router.delete("/units/{unit_id}")
+@router.delete("/units/{unit_id}", dependencies=only(*HR_ROLES))  # T-01 2.3
 async def delete_unit(
     unit_id: str,
     db: AsyncIOMotorDatabase = Depends(get_db),
@@ -172,7 +174,7 @@ async def update_position(
     doc = await db.dewi_org_positions.find_one({"position_id": position_id})
     return {"ok": True, "position": serialize(doc)}
 
-@router.delete("/positions/{position_id}")
+@router.delete("/positions/{position_id}", dependencies=only(*HR_ROLES))  # T-01 2.3
 async def delete_position(
     position_id: str,
     db: AsyncIOMotorDatabase = Depends(get_db),

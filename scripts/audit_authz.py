@@ -30,9 +30,54 @@ GATE_RX = re.compile(
     r"|APPROVER_ROLES|ADMIN_ROLES|FINANCE_ROLES|has_perm|require_perm|require_write_actor|is_vendor"
     r"|vendor_identity|\bscope|assert_\w+\(|_require_\w+\(|require_admin|require_role|ensure_role"
     r"|PROD_ADMIN_ROLES|PROD_VENDOR_ROLES|forbid_|only_roles|allowed_roles|\.get\(['\"]role['\"]\)"
+    r"|_admin\w*\(|resolve_my_employee|_my_employee_id"
     # kepemilikan: dokumen difilter user/karyawan yang login (self-service)
-    r"|user_id['\"]\s*:\s*user(\[|\.get)|_get_linked_employee|employee_id['\"]\s*:\s*emp\[")
+    r"|user_id['\"]\s*:\s*user(\[|\.get)|_get_linked_employee|employee_id['\"]\s*:\s*emp\["
+    r"|\[['\"](owner_id|created_by)['\"]\]\s*!=\s*(user\[|uid)|_get_access_level\(")
 PLAIN_DEPS = {"require_auth", "get_db", "_paginate_params", "_sort_params", "get_current_user"}
+# Endpoint yang SENGAJA tanpa gerbang peran (publik/bertanda-tangan platform/self-service) — FASE 2.5.
+EXEMPT = {
+    ("auth_routes", "/auth/change-password"): "self-service: ganti sandi sendiri",
+    ("dewi_client_portal", "/auth/login"): "publik: login portal klien",
+    ("marketing_webhooks", "/tokopedia"): "webhook platform (verifikasi tanda tangan di badan)",
+    ("marketing_webhooks", "/shopee"): "webhook platform (verifikasi tanda tangan di badan)",
+    ("marketing_webhooks", "/tiktok"): "webhook platform (verifikasi tanda tangan di badan)",
+    ("notifications", ""): "self-service: notifikasi untuk diri sendiri (target default = user)",
+    ("notifications_unified", "/{notif_id}/mark-read"): "self-service",
+    ("notifications_unified", "/mark-all-read"): "self-service",
+    ("rahaza_notifications", "/{notif_id}/read"): "self-service",
+    ("file_storage", "/upload"): "utilitas umum semua portal (lampiran), butuh login",
+    ("file_storage", "/attachments/{att_id}/meta"): "utilitas umum semua portal (lampiran), butuh login",
+}
+
+
+def _nested_includes() -> dict:
+    """modul -> modul lain yang berbagi/mewarisi router yang sama:
+    `router.include_router(anak.router)` (anak di bawah induk) atau
+    `from routes.X import router` (berkas ini mendaftar route ke router X, dan sebaliknya)."""
+    out: dict = {}
+    for dirpath, _, files in os.walk(ROUTES):
+        for f in files:
+            if not f.endswith(".py"):
+                continue
+            p = os.path.join(dirpath, f)
+            rel = os.path.relpath(p, ROUTES)[:-3]
+            src = open(p).read()
+            kids = re.findall(r"\brouter\.include_router\(\s*(\w+)\.router", src)
+            base = os.path.dirname(rel)
+            for k in kids:
+                out.setdefault(rel, []).append(os.path.join(base, k) if base else k)
+            for m in re.findall(r"^from routes\.([\w\.]+) import (?:\(\s*(?:#[^\n]*)?\n\s*)?router\b", src, re.M):
+                other = m.replace(".", "/")
+                out.setdefault(rel, []).append(other)
+                out.setdefault(other, []).append(rel)
+            # import relatif di paket sub-router: `from ._helpers import (\n router, ...`
+            for m in re.findall(r"^from \.(\w+) import \(?[^)\n]*?\brouter\b|^from \.(\w+) import \(\s*\n\s*router\b", src, re.M):
+                mod = m[0] or m[1]
+                other = os.path.join(base, mod) if base else mod
+                out.setdefault(rel, []).append(other)
+                out.setdefault(other, []).append(rel)
+    return out
 
 
 def _server_gated_modules() -> set:
@@ -46,6 +91,15 @@ def _server_gated_modules() -> set:
     for v in re.findall(r"app\.include_router\((\w+),\s*dependencies=", src):
         if v in mod_of:
             gated.add(mod_of[v].replace(".", "/"))
+    # sub-router yang di-include lewat router induk mewarisi gerbang server induknya
+    nested = _nested_includes()
+    stack = list(gated)
+    while stack:
+        parent = stack.pop()
+        for kid in nested.get(parent, []):
+            if kid not in gated:
+                gated.add(kid)
+                stack.append(kid)
     return gated
 
 
@@ -58,13 +112,14 @@ def _dep_names(fn: ast.AsyncFunctionDef | ast.FunctionDef) -> list:
     return names
 
 
-def _route_of(fn) -> tuple[str, str] | None:
+def _route_of(fn) -> tuple[str, str, bool] | None:
     for dec in fn.decorator_list:
         if isinstance(dec, ast.Call) and isinstance(dec.func, ast.Attribute):
             method = dec.func.attr.lower()
             if method in WRITE | {"get", "api_route", "websocket"} and dec.args:
                 path = dec.args[0].value if isinstance(dec.args[0], ast.Constant) else "?"
-                return method, path
+                dec_gate = any(k.arg == "dependencies" for k in dec.keywords)
+                return method, path, dec_gate
     return None
 
 
@@ -91,12 +146,13 @@ def scan() -> list[dict]:
                     continue
                 body = ast.unparse(node)
                 deps = _dep_names(node)
-                fn_gate = bool(GATE_RX.search(body)) or any(d not in PLAIN_DEPS for d in deps)
+                fn_gate = bool(GATE_RX.search(body)) or any(d not in PLAIN_DEPS for d in deps) or r[2]
+                exempt = (rel, r[1]) in EXEMPT
                 rows.append({
                     "router": rel, "method": r[0].upper(), "path": r[1], "function": node.name,
                     "line": node.lineno, "fn_gate": int(fn_gate), "file_router_gate": int(file_router_gated),
-                    "server_gate": int(rel in server_gated),
-                    "no_gate": int(not fn_gate and not file_router_gated and not (rel in server_gated)),
+                    "server_gate": int(rel in server_gated), "exempt": int(exempt),
+                    "no_gate": int(not fn_gate and not file_router_gated and not (rel in server_gated) and not exempt),
                 })
     return rows
 

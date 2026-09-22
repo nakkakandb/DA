@@ -19,6 +19,8 @@ from auth import require_auth, serialize_doc, log_activity
 from datetime import datetime, timezone
 
 from data.pdf_doc_registry import PDF_COLUMN_DEFINITIONS  # noqa: F401  (SSOT kolom)
+from core.authz import only  # T-01 2.3
+from core.roles import MGMT_ROLES  # T-01 2.3
 
 logger = logging.getLogger(__name__)
 
@@ -123,7 +125,7 @@ async def update_pdf_export_config(config_id: str, request: Request):
     return serialize_doc(await db.pdf_export_configs.find_one({'id': config_id}, {'_id': 0}))
 
 
-@router.delete("/pdf-export-configs/{config_id}")
+@router.delete("/pdf-export-configs/{config_id}", dependencies=only(*MGMT_ROLES))  # T-01 2.3
 async def delete_pdf_export_config(config_id: str, request: Request):
     user = await require_auth(request)
     db = get_db()

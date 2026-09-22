@@ -40,6 +40,8 @@ from datetime import datetime, timezone
 from io import BytesIO
 import logging
 import uuid
+from core.authz import only  # T-01 2.3
+from core.roles import WAREHOUSE_ROLES  # T-01 2.3
 
 log = logging.getLogger(__name__)
 
@@ -236,7 +238,7 @@ async def update_shipment(sid: str, body: dict, request: Request):
     return serialize_doc(out)
 
 
-@router.delete("/{sid}")
+@router.delete("/{sid}", dependencies=only(*WAREHOUSE_ROLES))  # T-01 2.3
 async def delete_shipment(sid: str, request: Request):
     user = await require_auth(request)
     db = get_db()

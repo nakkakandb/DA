@@ -28,6 +28,8 @@ from fastapi import APIRouter, HTTPException, Request, Query
 from pydantic import BaseModel, Field
 from database import get_db
 from auth import require_auth, serialize_doc, log_activity, check_role
+from core.authz import only  # T-01 2.3
+from core.roles import WAREHOUSE_ROLES  # T-01 2.3
 
 router = APIRouter(prefix="/api/wms", tags=["wms-structure"])
 
@@ -120,7 +122,7 @@ async def update_building(building_id: str, data: BuildingIn, request: Request):
     return {"message": "Gedung diupdate"}
 
 
-@router.delete("/buildings/{building_id}")
+@router.delete("/buildings/{building_id}", dependencies=only(*WAREHOUSE_ROLES))  # T-01 2.3
 async def delete_building(building_id: str, request: Request):
     await require_auth(request)
     db = get_db()
@@ -183,7 +185,7 @@ async def update_zone(zone_id: str, data: ZoneIn, request: Request):
     return {"message": "Zona diupdate"}
 
 
-@router.delete("/zones/{zone_id}")
+@router.delete("/zones/{zone_id}", dependencies=only(*WAREHOUSE_ROLES))  # T-01 2.3
 async def delete_zone(zone_id: str, request: Request):
     await require_auth(request)
     db = get_db()
@@ -362,7 +364,7 @@ async def update_rack(rack_id: str, data: RackIn, request: Request):
     return serialize_doc({"message": f"Rak diupdate{f', {added} posisi baru ditambahkan' if added else ''}"})
 
 
-@router.delete("/racks/{rack_id}")
+@router.delete("/racks/{rack_id}", dependencies=only(*WAREHOUSE_ROLES))  # T-01 2.3
 async def delete_rack(rack_id: str, request: Request):
     await require_auth(request)
     db = get_db()

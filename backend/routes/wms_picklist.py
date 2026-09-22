@@ -24,6 +24,8 @@ from fastapi import APIRouter, Query, Request, HTTPException
 from fastapi.responses import StreamingResponse
 from database import get_db
 from auth import require_auth
+from core.authz import only  # T-01 2.3
+from core.roles import WAREHOUSE_ROLES  # T-01 2.3
 
 router = APIRouter(prefix="/api/wms/picklist", tags=["wms-picklist"])
 
@@ -312,7 +314,7 @@ async def complete_picklist(picklist_id: str, request: Request):
     return {"ok": True}
 
 
-@router.delete("/{picklist_id}")
+@router.delete("/{picklist_id}", dependencies=only(*WAREHOUSE_ROLES))  # T-01 2.3
 async def delete_picklist(picklist_id: str, request: Request):
     await require_auth(request)
     db = get_db()

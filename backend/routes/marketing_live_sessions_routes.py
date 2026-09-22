@@ -14,6 +14,8 @@ from auth import require_auth
 # F6 (sesi #9) — daftar & ringkasan WAJIB berlingkup toko (core/marketing_account_scope).
 from core import marketing_account_scope as _scope
 import random
+from core.authz import only  # T-01 2.3
+from core.roles import MARKETING_ROLES  # T-01 2.3
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/marketing/live", tags=["marketing-live"])
@@ -542,7 +544,7 @@ async def update_live_session(session_id: str, body: LiveSessionUpdate,
                                  "products_reconciliation": _LP.reconcile(merged_doc, lines)})
 
 
-@router.delete("/sessions/{session_id}")
+@router.delete("/sessions/{session_id}", dependencies=only(*MARKETING_ROLES))  # T-01 2.3
 async def delete_live_session(session_id: str, request: Request):
     await require_auth(request)
     db = get_db()
@@ -631,7 +633,7 @@ async def update_session_product(session_id: str, line_id: str,
                                   "reconciliation": _LP.reconcile(session, lines)})
 
 
-@router.delete("/sessions/{session_id}/products/{line_id}")
+@router.delete("/sessions/{session_id}/products/{line_id}", dependencies=only(*MARKETING_ROLES))  # T-01 2.3
 async def delete_session_product(session_id: str, line_id: str, request: Request):
     await require_auth(request)
     db = get_db()

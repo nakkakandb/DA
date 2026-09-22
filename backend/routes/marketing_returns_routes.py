@@ -15,6 +15,8 @@ from auth import require_auth
 from core import marketing_account_scope as _scope
 from core import returns_bridge as _rb
 from routes.shared import require_portal
+from core.authz import only  # T-01 2.3
+from core.roles import MARKETING_CS_ROLES  # T-01 2.3
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/marketing/returns", tags=["marketing-returns"])
@@ -460,7 +462,7 @@ async def update_return(return_id: str, body: ReturnUpdate, request: Request):
     updated = {**existing, **upd}
     return {"success": True, "data": serialize(updated)}
 
-@router.delete("/{return_id}")
+@router.delete("/{return_id}", dependencies=only(*MARKETING_CS_ROLES))  # T-01 2.3
 async def delete_return(return_id: str, request: Request):
     await require_auth(request)
     db = get_db()

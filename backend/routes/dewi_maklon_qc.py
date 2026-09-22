@@ -14,6 +14,8 @@ from database import get_db
 from auth import require_auth
 from routes._maklon_adapter import legacy_orders_view as _lmo
 import uuid
+from core.authz import only  # T-01 2.3
+from core.roles import MAKLON_ROLES  # T-01 2.3
 
 router = APIRouter(prefix='/api/dewi/maklon/qc', tags=['Dewi-Maklon-QC'], dependencies=[Depends(deny_external_dep)])
 # ══════════════════════════════════════════════════════════════════════════════
@@ -164,7 +166,7 @@ async def update_qc(qc_id: str, payload: QCCheckIn, user: dict = Depends(require
     await db.dewi_maklon_qc_checks.update_one({'id': qc_id}, {'$set': update_data})
     return {'message': 'QC check diperbarui', 'reject_rate_pct': update_data['reject_rate_pct']}
 
-@router.delete('/{qc_id}')
+@router.delete('/{qc_id}', dependencies=only(*MAKLON_ROLES))  # T-01 2.3
 async def delete_qc(qc_id: str, user: dict = Depends(require_auth)):
     db = get_db()
     result = await db.dewi_maklon_qc_checks.delete_one({'id': qc_id})

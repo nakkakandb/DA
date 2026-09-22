@@ -9,6 +9,8 @@ from datetime import datetime, timezone
 from typing import Optional
 import uuid
 import re
+from core.authz import only  # T-01 2.3
+from core.roles import HR_ROLES  # T-01 2.3
 
 router = APIRouter(prefix="/api/dewi/lms", tags=["LMS"])
 
@@ -112,7 +114,7 @@ async def update_course(
     doc = await db.dewi_lms_courses.find_one({"course_id": course_id})
     return {"ok": True, "course": serialize(doc)}
 
-@router.delete("/courses/{course_id}")
+@router.delete("/courses/{course_id}", dependencies=only(*HR_ROLES))  # T-01 2.3
 async def delete_course(
     course_id: str,
     db: AsyncIOMotorDatabase = Depends(get_db),
@@ -172,7 +174,7 @@ async def update_material(
     doc = await db.dewi_lms_materials.find_one({"material_id": material_id})
     return {"ok": True, "material": serialize(doc)}
 
-@router.delete("/materials/{material_id}")
+@router.delete("/materials/{material_id}", dependencies=only(*HR_ROLES))  # T-01 2.3
 async def delete_material(
     material_id: str,
     db: AsyncIOMotorDatabase = Depends(get_db),

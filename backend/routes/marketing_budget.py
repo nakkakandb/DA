@@ -50,6 +50,8 @@ from auth import require_auth, serialize_doc
 from core import marketing_sales_shape as _shape
 from core import marketing_cycle as _cycle
 from core import marketing_account_scope as _scope
+from core.authz import only  # T-01 2.3
+from core.roles import MARKETING_ROLES  # T-01 2.3
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix='/api/marketing/budget', tags=['Marketing-Budget'])
@@ -443,7 +445,7 @@ async def list_spend(request: Request, account_id: str = Query(...), period: str
     return {'ok': True, 'entries': [serialize_doc(r) for r in rows], 'total': len(rows)}
 
 
-@router.delete('/spend/{sid}')
+@router.delete('/spend/{sid}', dependencies=only(*MARKETING_ROLES))  # T-01 2.3
 async def delete_spend(sid: str, request: Request):
     await require_auth(request)
     db = get_db()

@@ -24,6 +24,8 @@ from database import get_db
 from auth import require_auth
 from utils.helpers import _uid, _now, _clean, _clean_list
 import logging
+from core.authz import only  # T-01 2.3
+from core.roles import MARKETING_ROLES  # T-01 2.3
 
 logger = logging.getLogger(__name__)
 
@@ -149,7 +151,7 @@ async def toggle_flashsale(flashsale_id: str, user=Depends(require_auth)):
     return {'message': f'Status flashsale: {new_status}', 'status': new_status}
 
 
-@router.delete('/flashsales/{flashsale_id}')
+@router.delete('/flashsales/{flashsale_id}', dependencies=only(*MARKETING_ROLES))  # T-01 2.3
 async def delete_flashsale(flashsale_id: str, user=Depends(require_auth)):
     db = get_db()
     doc = await db.dewi_toko_flashsales.find_one({'id': flashsale_id})

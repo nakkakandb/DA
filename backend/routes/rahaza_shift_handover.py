@@ -30,6 +30,8 @@ from datetime import datetime, timezone, date, timedelta
 from typing import Optional
 import uuid
 import logging
+from core.authz import only  # T-01 2.3
+from core.roles import PRODUCTION_ROLES  # T-01 2.3
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/rahaza", tags=["rahaza-shift-handover"])
@@ -384,7 +386,7 @@ async def update_handover_template(template_id: str, request: Request):
     return updated
 
 
-@router.delete("/handover-templates/{template_id}")
+@router.delete("/handover-templates/{template_id}", dependencies=only(*PRODUCTION_ROLES))  # T-01 2.3
 async def deactivate_handover_template(template_id: str, request: Request):
     """Deactivate handover template."""
     await require_auth(request)

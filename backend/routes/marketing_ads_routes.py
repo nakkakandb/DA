@@ -16,6 +16,8 @@ from auth import require_auth
 from core import marketing_account_scope as _scope
 from ai_llm import LlmChat, UserMessage
 import random
+from core.authz import only  # T-01 2.3
+from core.roles import MARKETING_ROLES  # T-01 2.3
 
 EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
 
@@ -506,7 +508,7 @@ async def update_ads_entry(entry_id: str, body: AdsEntryUpdate, request: Request
     return success_response(data=serialize({**existing, **upd}))
 
 
-@router.delete("/campaigns/{entry_id}")
+@router.delete("/campaigns/{entry_id}", dependencies=only(*MARKETING_ROLES))  # T-01 2.3
 async def delete_ads_entry(entry_id: str, request: Request):
     await require_auth(request)
     db = get_db()

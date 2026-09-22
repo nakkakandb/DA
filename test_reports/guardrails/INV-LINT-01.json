@@ -2,12 +2,39 @@
   "gate": "INV-LINT-01",
   "title": "Gate lint platform bisa jalan & lulus (oxlint + import validation)",
   "checked": 6,
-  "counts": {},
-  "blocking": 0,
+  "counts": {
+    "HIGH": 4
+  },
+  "blocking": 4,
   "block_sev": [
     "HIGH"
   ],
-  "duration_s": 55.39,
-  "ts": "2026-09-19 04:58:20",
-  "findings": []
+  "duration_s": 20.28,
+  "ts": "2026-09-22 11:07:16",
+  "findings": [
+    {
+      "sev": "HIGH",
+      "code": "LINT-IMPORT-BROKEN",
+      "msg": "Import Validation GAGAL pada '.' (2 temuan) \u21d2 engine_success=False \u21d2 gate menolak `finish`/`ask_human`. Pertama: frontend/src/components/erp/userGuide/ModuleHelpDrawer.jsx:3 - Package '@radix-ui/react-visually-hidden' not found in package.json dependencies. Run: npm install @radix-ui/react-visually-hidden",
+      "loc": "."
+    },
+    {
+      "sev": "HIGH",
+      "code": "LINT-IMPORT-BROKEN",
+      "msg": "Import Validation GAGAL pada 'frontend' (2 temuan) \u21d2 engine_success=False \u21d2 gate menolak `finish`/`ask_human`. Pertama: frontend/src/components/erp/userGuide/ModuleHelpDrawer.jsx:3 - Package '@radix-ui/react-visually-hidden' not found in package.json dependencies. Run: npm install @radix-ui/react-visually-hidden",
+      "loc": "frontend"
+    },
+    {
+      "sev": "HIGH",
+      "code": "LINT-ENGINE-DOWN",
+      "msg": "arm OXLINT '.': engine_success=False \u21d2 gate akan menolak `finish`/`ask_human`. Keluaran: ",
+      "loc": "."
+    },
+    {
+      "sev": "HIGH",
+      "code": "LINT-ENGINE-DOWN",
+      "msg": "arm OXLINT 'frontend': engine_success=False \u21d2 gate akan menolak `finish`/`ask_human`. Keluaran: ",
+      "loc": "frontend"
+    }
+  ]
 }

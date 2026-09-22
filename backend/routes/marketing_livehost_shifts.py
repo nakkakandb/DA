@@ -27,6 +27,8 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional, List
 import json
 import asyncio
+from core.authz import only  # T-01 2.3
+from core.roles import MARKETING_ROLES  # T-01 2.3
 
 _log = logging.getLogger(__name__)
 
@@ -291,7 +293,7 @@ async def update_shift(shift_id: str, data: ShiftUpdate, request: Request):
     return serialize_doc({'message': 'Shift berhasil diupdate'})
 
 
-@router.delete('/shifts/{shift_id}')
+@router.delete('/shifts/{shift_id}', dependencies=only(*MARKETING_ROLES))  # T-01 2.3
 async def delete_shift(shift_id: str, request: Request):
     """Admin deletes shift"""
     await require_auth(request)

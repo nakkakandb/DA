@@ -33,6 +33,8 @@ from utils.counters import gen_prefixed_number
 from auth import require_auth, serialize_doc
 from core import returns_bridge as _rb
 import logging
+from core.authz import only  # T-01 2.3
+from core.roles import WAREHOUSE_ROLES  # T-01 2.3
 
 logger = logging.getLogger(__name__)
 
@@ -323,7 +325,7 @@ async def update_return(return_id: str, request: Request):
     return serialize_doc(result)
 
 
-@router.delete("/returns/{return_id}")
+@router.delete("/returns/{return_id}", dependencies=only(*WAREHOUSE_ROLES))  # T-01 2.3
 async def delete_return(return_id: str, request: Request):
     await require_auth(request)
     db = get_db()

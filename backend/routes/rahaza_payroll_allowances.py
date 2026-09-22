@@ -23,6 +23,8 @@ import csv
 import logging
 from datetime import datetime, timezone, date, timedelta
 from typing import Optional
+from core.authz import only  # T-01 2.3
+from core.roles import HR_ROLES  # T-01 2.3
 
 log = logging.getLogger(__name__)
 
@@ -103,7 +105,7 @@ async def update_allowance(allowance_id: str, request: Request):
     return {"ok": True, "allowance": serialize_doc(doc)}
 
 
-@router.delete("/payroll-allowances/{allowance_id}")
+@router.delete("/payroll-allowances/{allowance_id}", dependencies=only(*HR_ROLES))  # T-01 2.3
 async def delete_allowance(allowance_id: str, request: Request):
     await require_auth(request)
     db = get_db()

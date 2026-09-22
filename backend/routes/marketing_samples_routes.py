@@ -14,6 +14,8 @@ from pydantic import BaseModel, Field
 from core import marketing_account_scope as _scope
 from database import get_db
 from auth import require_auth
+from core.authz import only  # T-01 2.3
+from core.roles import MARKETING_ROLES  # T-01 2.3
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/marketing/samples", tags=["marketing-samples"])
@@ -384,7 +386,7 @@ async def update_sample(sample_id: str, body: SampleUpdate, request: Request):
     updated = {**existing, **upd}
     return {"success": True, "data": serialize(updated)}
 
-@router.delete("/{sample_id}")
+@router.delete("/{sample_id}", dependencies=only(*MARKETING_ROLES))  # T-01 2.3
 async def delete_sample(sample_id: str, request: Request):
     await require_auth(request)
     db = get_db()

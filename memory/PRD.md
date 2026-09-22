@@ -1,5 +1,15 @@
 # PRD — CV. Dewi Aditya ERP
 
+## SESI 2026-09-22 #2 — FASE 2.3–2.5 `PLAN_PERBAIKAN_AUDIT.md` (repo `kiutdsv/DA`, di-bring-up ulang ke /app)
+**Dikerjakan & teruji (`tests/test_fase23_delete_gates.py` 66/66; regresi `test_fase2_rbac.py`, `test_fase1_audit.py`, `verify_rbac_idor.py` 806/0, `verify_adversarial_5xx.py`, `health_check.py` hijau):**
+- **2.3** 77 endpoint DELETE yang dulu hanya butuh "sudah login" (peran internal mana pun, mis. `operator`, bisa menghapus) kini `dependencies=only(*ROLES)` per domain: `core/authz.only()` + konstanta `core/roles.py` (`MGMT_ROLES`, `HR_ROLES`, `PRODUCTION_ROLES`, `WAREHOUSE_ROLES`, `RND_ROLES`, `MAKLON_ROLES`, `MARKETING_ROLES`, `MARKETING_CS_ROLES`). Patch idempoten: `scripts/_patch_fase23_delete_gates.py`. Kepemilikan: hapus cuti hanya pemohon/HR; cabut delegasi hanya pendelegasi/HR.
+- **2.4** sudah tertutup sesi sebelumnya (`submit_review` reviewer/HR, `delete_hpp` R&D/finance, portal-accounts admin_maklon).
+- **2.5** server gate `_DENY_EXTERNAL`: `document_number_configs`, `comm` (chat internal), `universal_scan`, `marketing_orders`. Gerbang fungsi: `POST /api/push/send` (HR/admin), `POST /api/marketing/webhooks/manual` & `/events/{id}/reprocess` (MARKETING_ROLES), `POST /api/notifications/trigger/wo-due-scan` (PRODUCTION_ROLES).
+- **Audit** `scripts/audit_authz.py` diperbaiki: melihat `dependencies=` di dekorator, sub-router berbagi objek `router` (`dewi_rnd_*`, `asset/*`, `communication/*`), pola kepemilikan, daftar `EXEMPT` beralasan (webhook platform, login klien, ganti sandi, notifikasi self-service, lampiran). Hasil: **tanpa gerbang sama sekali 0 (baseline 0)**, DELETE tanpa gerbang fungsi 0. Kolom CSV baru `exempt`.
+- Lingkungan: `bootstrap.sh` gagal pip (konflik litellm) → deps dipasang via `scripts/_setup_deps.sh` + `emergentintegrations` terpisah. Akun uji `uji.{role}@dewiaditya.id`/`Dewi@123` di-seed ulang (`memory/test_credentials.md`).
+**Belum:** FASE 0 (aksi owner di VPS: ganti sandi `Admin@123`, cek `CORS_ORIGINS`), FASE 3–5.
+
+
 ## SESI 2026-09-22 — FASE 1 + FASE 2.1–2.2 `PLAN_PERBAIKAN_AUDIT.md` (repo `nakiavsce/DA`)
 **Dikerjakan & teruji (testing agent iteration_219; `tests/test_fase1_audit.py` 22/22, `tests/test_fase2_rbac.py` 58/58; `gate.sh` gate baru lolos):**
 - **T-04** `core/product_costing.py`: `computable` hanya bila SEMUA baris BOM `ok`; `apply_model_cost` menolak size tidak computable (tidak menulis `hpp_bom`/FG/katalog), alasan tercatat di `skipped`.

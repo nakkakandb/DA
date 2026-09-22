@@ -16,6 +16,8 @@ from fastapi import APIRouter, Request, Query, HTTPException
 from pydantic import BaseModel, Field
 from database import get_db
 from auth import require_auth
+from core.authz import only  # T-01 2.3
+from core.roles import HR_ROLES  # T-01 2.3
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/hr/job-board", tags=["job-board"])
@@ -174,7 +176,7 @@ async def close_job_posting(request: Request, job_id: str):
         "message": "Job closed"
     }
 
-@router.delete("/jobs/{job_id}")
+@router.delete("/jobs/{job_id}", dependencies=only(*HR_ROLES))  # T-01 2.3
 async def delete_job_posting(request: Request, job_id: str):
     """Delete a job posting."""
     await require_auth(request)

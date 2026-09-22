@@ -15,6 +15,8 @@ from core import marketing_account_scope as _scope
 from database import get_db
 from auth import require_auth
 from core import material_fields as _mf  # FASE 6.6-B: SSOT nama field + alias legacy yarn_*
+from core.authz import only  # T-01 2.3
+from core.roles import MARKETING_ROLES  # T-01 2.3
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/marketing/product-launches", tags=["marketing-product-launches"])
@@ -473,7 +475,7 @@ async def update_launch(launch_id: str, body: LaunchUpdate, request: Request):
     return {"success": True, "data": serialize(updated)}
 
 
-@router.delete("/{launch_id}")
+@router.delete("/{launch_id}", dependencies=only(*MARKETING_ROLES))  # T-01 2.3
 async def delete_launch(launch_id: str, request: Request):
     await require_auth(request)
     db = get_db()

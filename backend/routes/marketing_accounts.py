@@ -17,6 +17,8 @@ from core import marketing_account_scope as scope
 from auth import require_auth, serialize_doc, log_activity
 from routes.marketing_shared import _uid, _now, _get_user, _sanitize, PlatformAccountCreate, PlatformAccountUpdate, SalesDataEntry
 from core import marketing_sales_shape as _shape
+from core.authz import only  # T-01 2.3
+from core.roles import MGMT_ROLES  # T-01 2.3
 
 logger = logging.getLogger(__name__)
 
@@ -601,7 +603,7 @@ async def update_platform_account(account_id: str, data: PlatformAccountUpdate, 
     return serialize_doc({"message": "Platform account updated", "account": updated})
 
 
-@router.delete("/accounts/{account_id}")
+@router.delete("/accounts/{account_id}", dependencies=only(*MGMT_ROLES))  # T-01 2.3
 async def archive_platform_account(account_id: str, request: Request):
     """
     Archive (soft delete) platform account.

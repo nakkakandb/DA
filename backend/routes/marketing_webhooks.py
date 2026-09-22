@@ -37,6 +37,8 @@ from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Query, Re
 from pydantic import BaseModel
 
 from auth import require_auth, serialize_doc
+from core.authz import only  # T-01 2.5
+from core.roles import MARKETING_ROLES  # T-01 2.5
 from database import get_db
 from utils import webhook_security
 
@@ -377,7 +379,7 @@ class ManualIngestBody(BaseModel):
     payload: dict
 
 
-@router.post("/manual")
+@router.post("/manual", dependencies=only(*MARKETING_ROLES))  # T-01 2.5
 async def manual_ingest(body: ManualIngestBody, request: Request, background_tasks: BackgroundTasks):
     user = await require_auth(request)
     db = get_db()
@@ -441,7 +443,7 @@ async def get_event(event_id: str, request: Request):
     return {"ok": True, "data": serialize_doc(doc)}
 
 
-@router.post("/events/{event_id}/reprocess")
+@router.post("/events/{event_id}/reprocess", dependencies=only(*MARKETING_ROLES))  # T-01 2.5
 async def reprocess_event(event_id: str, request: Request, background_tasks: BackgroundTasks):
     await require_auth(request)
     db = get_db()

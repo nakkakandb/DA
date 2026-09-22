@@ -27,6 +27,8 @@ the new canonical path `/api/wms/legacy/*`.
 """
 from fastapi import APIRouter, Request
 from routes import warehouse as legacy
+from core.authz import only  # T-01 2.3
+from core.roles import WAREHOUSE_ROLES  # T-01 2.3
 
 router = APIRouter(prefix="/api/wms/legacy", tags=["wms-legacy-bridge"])
 
@@ -48,7 +50,7 @@ async def update_location(location_id: str, request: Request):
     return await legacy.update_location(location_id, request)
 
 
-@router.delete("/locations/{location_id}")
+@router.delete("/locations/{location_id}", dependencies=only(*WAREHOUSE_ROLES))  # T-01 2.3
 async def delete_location(location_id: str, request: Request):
     return await legacy.delete_location(location_id, request)
 
@@ -75,7 +77,7 @@ async def update_receiving(receipt_id: str, request: Request):
     return await legacy.update_receiving(receipt_id, request)
 
 
-@router.delete("/receiving/{receipt_id}")
+@router.delete("/receiving/{receipt_id}", dependencies=only(*WAREHOUSE_ROLES))  # T-01 2.3
 async def delete_receiving(receipt_id: str, request: Request):
     return await legacy.delete_receiving(receipt_id, request)
 

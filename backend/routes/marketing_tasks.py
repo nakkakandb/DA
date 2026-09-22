@@ -20,6 +20,8 @@ from database import get_db
 from auth import require_auth, serialize_doc, log_activity
 from routes.marketing_shared import _uid, _now, _get_user, _sanitize, TaskCreate, TaskUpdate, TaskCompleteAction, _generate_task_code, _is_pic_role, _recalculate_health_score
 from core import marketing_sales_shape as _shape
+from core.authz import only  # T-01 2.3
+from core.roles import MARKETING_CS_ROLES  # T-01 2.3
 
 logger = logging.getLogger(__name__)
 
@@ -305,7 +307,7 @@ async def reject_task(task_id: str, reason: str, request: Request):
     return serialize_doc({"message": "Task rejected", "reason": reason})
 
 
-@router.delete("/tasks/{task_id}")
+@router.delete("/tasks/{task_id}", dependencies=only(*MARKETING_CS_ROLES))  # T-01 2.3
 async def delete_task(task_id: str, request: Request):
     """
     Delete task (soft delete - set status to cancelled).

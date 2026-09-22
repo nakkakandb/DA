@@ -18,6 +18,8 @@ from auth import require_auth, log_activity
 from utils.counters import next_counter, gen_prefixed_number
 from core import stock_service
 import logging
+from core.authz import only  # T-01 2.3
+from core.roles import PRODUCTION_ROLES  # T-01 2.3
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/production/material-returns", tags=["production-material-returns"])
@@ -392,7 +394,7 @@ async def receive_return(request: Request, return_id: str, body: ActionModel):
     return _ok(message=f"Material return diterima. {len(items)} item dikembalikan ke stok.")
 
 
-@router.delete("/{return_id}")
+@router.delete("/{return_id}", dependencies=only(*PRODUCTION_ROLES))  # T-01 2.3
 async def delete_return(request: Request, return_id: str):
     await require_auth(request)
     db = get_db()

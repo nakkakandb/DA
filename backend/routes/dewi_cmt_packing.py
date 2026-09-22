@@ -49,6 +49,8 @@ logger = logging.getLogger(__name__)
 # Definisi SSOT-nya ada di `core/cmt_receipt_status.py` supaya konsumen lain
 # (permak, buyer shipment) memakai gerbang yang SAMA — bukan salinan yang
 # tertinggal (pelajaran audit: gerbang status yang disalin selalu menyimpang).
+from core.authz import only  # T-01 2.3
+from core.roles import PRODUCTION_ROLES  # T-01 2.3
 from core.cmt_receipt_status import (  # noqa: E402
     ST_QC, ST_DONE, ST_CANCELLED, STATUS_LABEL,
     canon_status as _canon_status,
@@ -609,7 +611,7 @@ async def update_line(receipt_id: str, line_id: str, request: Request):
     return serialize_doc(result)
 
 
-@router.delete("/cmt-receipts/{receipt_id}/lines/{line_id}")
+@router.delete("/cmt-receipts/{receipt_id}/lines/{line_id}", dependencies=only(*PRODUCTION_ROLES))  # T-01 2.3
 async def delete_line(receipt_id: str, line_id: str, request: Request):
     await require_auth(request)
     db = get_db()

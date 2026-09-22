@@ -48,6 +48,8 @@ from auth import require_auth, serialize_doc
 from core import fabric_roll_engine  # FASE H-5: satu pintu penerbitan & pemakaian roll
 import io
 import logging
+from core.authz import only  # T-01 2.3
+from core.roles import WAREHOUSE_ROLES  # T-01 2.3
 
 try:
     from reportlab.pdfgen import canvas
@@ -620,7 +622,7 @@ async def roll_label_pdf(roll_id: str, request: Request, token: Optional[str] = 
     )
 
 
-@router.delete("/{roll_id}")
+@router.delete("/{roll_id}", dependencies=only(*WAREHOUSE_ROLES))  # T-01 2.3
 async def delete_roll(roll_id: str, request: Request):
     await require_auth(request)
     db = get_db()

@@ -6,7 +6,7 @@
 Dipasang di `server.py` lewat `dependencies=[...]` pada `include_router` supaya satu perubahan
 menutup lintas-portal (vendor/klien/buyer menembak endpoint internal) untuk ratusan endpoint.
 """
-from fastapi import HTTPException, Request
+from fastapi import Depends, HTTPException, Request
 
 from auth import verify_token
 
@@ -45,3 +45,8 @@ def require_roles(*roles: str):
             raise HTTPException(403, f"Akses ditolak: butuh peran {', '.join(sorted(roles))}.")
     _dep.__name__ = f"require_roles[{','.join(sorted(allowed))}]"
     return _dep
+
+
+def only(*roles: str) -> list:
+    """Gerbang eksplisit per endpoint (FASE 2.3): `@router.delete(path, dependencies=only(*HR_ROLES))`."""
+    return [Depends(require_roles(*roles))]

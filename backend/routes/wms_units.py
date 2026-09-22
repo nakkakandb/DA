@@ -30,6 +30,8 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 from database import get_db
 from auth import require_auth, serialize_doc, log_activity
+from core.authz import only  # T-01 2.3
+from core.roles import WAREHOUSE_ROLES  # T-01 2.3
 
 router = APIRouter(prefix="/api/wms", tags=["wms-units"])
 
@@ -253,7 +255,7 @@ async def update_unit(unit_id: str, data: UnitIn, request: Request):
     return serialize_doc({"message": "Unit diupdate"})
 
 
-@router.delete("/units/{unit_id}")
+@router.delete("/units/{unit_id}", dependencies=only(*WAREHOUSE_ROLES))  # T-01 2.3
 async def delete_unit(unit_id: str, request: Request):
     await require_auth(request)
     db = get_db()
@@ -313,7 +315,7 @@ async def update_conversion(conv_id: str, data: ConversionIn, request: Request):
     return {"message": "Konversi diupdate"}
 
 
-@router.delete("/unit-conversions/{conv_id}")
+@router.delete("/unit-conversions/{conv_id}", dependencies=only(*WAREHOUSE_ROLES))  # T-01 2.3
 async def delete_conversion(conv_id: str, request: Request):
     await require_auth(request)
     db = get_db()

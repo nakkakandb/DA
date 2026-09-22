@@ -18,6 +18,8 @@ from routes.shared import require_portal
 from ai_llm import LlmChat, UserMessage
 import json
 import calendar
+from core.authz import only  # T-01 2.3
+from core.roles import MARKETING_CS_ROLES  # T-01 2.3
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/marketing/content-calendar", tags=["marketing-content-calendar"])
@@ -435,7 +437,7 @@ async def update_entry(entry_id: str, body: ContentEntryUpdate, request: Request
     return {"success": True, "data": serialize(updated)}
 
 
-@router.delete("/{entry_id}")
+@router.delete("/{entry_id}", dependencies=only(*MARKETING_CS_ROLES))  # T-01 2.3
 async def delete_entry(entry_id: str, request: Request):
     await require_auth(request)
     db = get_db()

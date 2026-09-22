@@ -64,6 +64,8 @@ from utils.pdf_common import (
     get_doc_settings,
     resolve_signature_name,
 )
+from core.authz import only  # T-01 2.3
+from core.roles import WAREHOUSE_ROLES  # T-01 2.3
 
 try:
     from reportlab.lib import colors
@@ -629,7 +631,7 @@ async def cancel_sj(sj_id: str, data: CancelIn, request: Request):
     return {"ok": True}
 
 
-@router.delete("/{sj_id}")
+@router.delete("/{sj_id}", dependencies=only(*WAREHOUSE_ROLES))  # T-01 2.3
 async def delete_sj(sj_id: str, request: Request):
     await require_auth(request)
     db = get_db()

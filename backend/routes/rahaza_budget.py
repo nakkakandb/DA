@@ -27,6 +27,8 @@ from typing import Optional
 import uuid
 import logging
 import io
+from core.authz import only  # T-01 2.3
+from core.roles import FINANCE_ROLES  # T-01 2.3
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/rahaza/finance", tags=["rahaza-budget"])
@@ -131,7 +133,7 @@ async def update_budget(bid: str, request: Request):
     return serialize_doc(out)
 
 
-@router.delete("/budgets/{bid}")
+@router.delete("/budgets/{bid}", dependencies=only(*FINANCE_ROLES))  # T-01 2.3
 async def delete_budget(bid: str, request: Request):
     await require_auth(request)
     db = get_db()
@@ -290,7 +292,7 @@ async def update_budget_item(bid: str, iid: str, request: Request):
     return serialize_doc(out)
 
 
-@router.delete("/budgets/{bid}/items/{iid}")
+@router.delete("/budgets/{bid}/items/{iid}", dependencies=only(*FINANCE_ROLES))  # T-01 2.3
 async def delete_budget_item(bid: str, iid: str, request: Request):
     await require_auth(request)
     db = get_db()

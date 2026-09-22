@@ -23,6 +23,8 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional, List
 import json
 import asyncio
+from core.authz import only  # T-01 2.3
+from core.roles import MARKETING_ROLES  # T-01 2.3
 
 _log = logging.getLogger(__name__)
 
@@ -114,7 +116,7 @@ async def update_training(training_id: str, data: TrainingCreate, request: Reque
     return serialize_doc({'message': 'Training berhasil diupdate'})
 
 
-@router.delete('/training/{training_id}')
+@router.delete('/training/{training_id}', dependencies=only(*MARKETING_ROLES))  # T-01 2.3
 async def delete_training(training_id: str, request: Request):
     """Admin deletes training (soft delete)"""
     await require_auth(request)

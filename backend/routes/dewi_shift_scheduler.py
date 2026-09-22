@@ -15,6 +15,8 @@ from fastapi import APIRouter, Request, Query, HTTPException
 from pydantic import BaseModel
 from database import get_db
 from auth import require_auth
+from core.authz import only  # T-01 2.3
+from core.roles import HR_ROLES  # T-01 2.3
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/hr/shift-scheduler", tags=["shift-scheduler"])
@@ -85,7 +87,7 @@ async def list_shift_templates(request: Request):
         "data": templates
     }
 
-@router.delete("/templates/{template_id}")
+@router.delete("/templates/{template_id}", dependencies=only(*HR_ROLES))  # T-01 2.3
 async def delete_shift_template(request: Request, template_id: str):
     """Delete a shift template."""
     await require_auth(request)
@@ -316,7 +318,7 @@ async def publish_schedule(request: Request, schedule_id: str):
         "message": "Schedule published"
     }
 
-@router.delete("/schedules/{schedule_id}")
+@router.delete("/schedules/{schedule_id}", dependencies=only(*HR_ROLES))  # T-01 2.3
 async def delete_schedule(request: Request, schedule_id: str):
     """Delete a schedule."""
     await require_auth(request)

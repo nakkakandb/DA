@@ -25,6 +25,8 @@ from fastapi.responses import StreamingResponse
 from database import get_db
 from datetime import datetime, timezone, timedelta
 from auth import require_auth as _require_auth_std, JWT_SECRET
+from core.authz import only  # T-01 2.5
+from core.roles import PRODUCTION_ROLES  # T-01 2.5
 from utils.notif_unified import (
     notif_insert,
     reshape_as_rahaza,
@@ -316,7 +318,7 @@ async def mark_all_read(request: Request):
 
 
 # ─── TRIGGER SCANS (manual / cron) ───────────────────────────────────────────
-@router.post("/trigger/wo-due-scan")
+@router.post("/trigger/wo-due-scan", dependencies=only(*PRODUCTION_ROLES))  # T-01 2.5
 async def scan_wo_due(request: Request):
     """
     Cron/manual scan: cari WO status in_progress dengan due_date dalam 2 hari,
